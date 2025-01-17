@@ -4,6 +4,8 @@ from tkinter import messagebox
 from ttkbootstrap.constants import *
 from tkinter import messagebox, Canvas, Scrollbar, Frame
 
+
+# BRYAN
 def format_date_input(event):
     """Format date as MM/DD/YYYY while the user types."""
     entry = event.widget
