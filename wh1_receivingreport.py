@@ -46,6 +46,10 @@ class Wh1ReceivingReport:
                 )
                 self.cursor = self.conn.cursor()
                 print("Database connection established.")
+            elif self.cursor is None or self.cursor.closed:
+                # Recreate cursor if it is closed
+                self.cursor = self.conn.cursor()
+                print("Database cursor re-established.")
         except Exception as e:
             print(f"Error connecting to database: {e}")
 
@@ -61,18 +65,27 @@ class Wh1ReceivingReport:
 
     def fetch_data_from_wh1_receiving_report(self):
         """Fetch the latest data from Table 1 with date format MM/DD/YYYY."""
-        query = """
-            SELECT wh1_receiving_report.reference_no, 
-                   TO_CHAR(wh1_receiving_report.date_received, 'MM/DD/YYYY') AS date_received, 
-                   material_codes.material_code, 
-                   wh1_receiving_report.quantity, 
-                   wh1_receiving_report.area_location 
-            FROM wh1_receiving_report
-            INNER JOIN material_codes
-                ON wh1_receiving_report.material_code = material_codes.mid;
-        """
-        self.cursor.execute(query)
-        return self.cursor.fetchall()
+        try:
+            query = """
+                SELECT wh1_receiving_report.reference_no, 
+                       TO_CHAR(wh1_receiving_report.date_received, 'MM/DD/YYYY') AS date_received, 
+                       material_codes.material_code, 
+                       wh1_receiving_report.quantity, 
+                       wh1_receiving_report.area_location 
+                FROM wh1_receiving_report
+                INNER JOIN material_codes
+                    ON wh1_receiving_report.material_code = material_codes.mid;
+            """
+            self.cursor.execute(query)
+            return self.cursor.fetchall()
+        except psycopg2.InterfaceError as e:
+            print(f"Cursor error: {e}")
+            self.connect_db()  # Reconnect if cursor is closed
+            self.cursor.execute(query)
+            return self.cursor.fetchall()
+        except Exception as e:
+            print(f"Error fetching data: {e}")
+            return []
 
     def update_treeview(self, treeview, data, column_names):
         """Update the Treeview with the latest data."""

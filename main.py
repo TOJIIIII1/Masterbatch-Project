@@ -4,6 +4,8 @@ from wh1_receivingreport import Wh1ReceivingReport
 from wh1_transfer_form import Wh1TransferForm
 from wh1_outgoingreport import Wh1OutgoingReport
 from wh1_preparation_form import Wh1PreparationForm
+from add_material_code import AddMaterialCode
+from Spreedsheet_wh1 import ExportTablePage
 
 class MainApp:
     #sadjfhaskjasdasdasdasd hello
@@ -34,8 +36,8 @@ class MainApp:
                 "Preaparation Form": Wh1ReceivingReport(),
             },
             "Reports": {
-                "Receiving Report": Wh1ReceivingReport(),
-                "Transfer Form": Wh1TransferForm(),
+                "Add Material Code": AddMaterialCode(),
+                "Export Table": ExportTablePage(),
                 "Outgoing Report": Wh1ReceivingReport(),
                 "Preaparation Form": Wh1ReceivingReport(),
             },

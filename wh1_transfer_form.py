@@ -32,7 +32,7 @@ class Wh1TransferForm:
         self.connect_db()
 
     def connect_db(self):
-        """Establish a connection to the PostgreSQL database and create a cursor."""
+        """Ensure the database connection is active and cursor is open."""
         try:
             if self.conn is None or self.conn.closed != 0:
                 # Reconnect to the database if the connection is closed
@@ -45,12 +45,17 @@ class Wh1TransferForm:
                 )
                 self.cursor = self.conn.cursor()
                 print("Database connection established.")
+            elif self.cursor is None or self.cursor.closed:
+                # Recreate the cursor if it is closed
+                self.cursor = self.conn.cursor()
+                print("Database cursor re-established.")
         except Exception as e:
             print(f"Error connecting to database: {e}")
 
     def fetch_material_codes(self):
         """Fetch distinct material codes from the database for the dropdown."""
         try:
+            self.connect_db()  # Ensure connection is open before executing the query
             query = "SELECT material_code FROM material_codes;"
             self.cursor.execute(query)
             return [row[0] for row in self.cursor.fetchall()]
@@ -60,18 +65,28 @@ class Wh1TransferForm:
 
     def fetch_data_from_wh1_transfer_form(self):
         """Fetch the latest data from Table 1 with date format MM/DD/YYYY."""
-        query = """
-            SELECT wh1_transfer_form.reference_no, 
-                   TO_CHAR(wh1_transfer_form.date, 'MM/DD/YYYY') AS date, 
-                   material_codes.material_code, 
-                   wh1_transfer_form.quantity, 
-                   wh1_transfer_form.area_to
-            FROM wh1_transfer_form
-            INNER JOIN material_codes
-                ON wh1_transfer_form.material_code = material_codes.mid;
-        """
-        self.cursor.execute(query)
-        return self.cursor.fetchall()
+        try:
+            self.connect_db()  # Ensure connection is open before executing the query
+            query = """
+                SELECT wh1_transfer_form.reference_no, 
+                       TO_CHAR(wh1_transfer_form.date, 'MM/DD/YYYY') AS date, 
+                       material_codes.material_code, 
+                       wh1_transfer_form.quantity, 
+                       wh1_transfer_form.area_to
+                FROM wh1_transfer_form
+                INNER JOIN material_codes
+                    ON wh1_transfer_form.material_code = material_codes.mid;
+            """
+            self.cursor.execute(query)
+            return self.cursor.fetchall()
+        except psycopg2.InterfaceError as e:
+            print(f"Cursor error: {e}")
+            self.connect_db()  # Reconnect if cursor is closed
+            self.cursor.execute(query)
+            return self.cursor.fetchall()
+        except Exception as e:
+            print(f"Error fetching data: {e}")
+            return []
 
     def update_treeview(self, treeview, data, column_names):
         """Update the Treeview with the latest data."""
@@ -205,6 +220,9 @@ class Wh1TransferForm:
 
         entry_frame.grid_columnconfigure(0, weight=1)
         entry_frame.grid_columnconfigure(len(column_names_wh1_transfer_form) - 1, weight=1)
+
+    # Other methods (add_row_wh1_transfer_form, update_row_wh1_transfer_form, etc.) remain the same.
+
 
     def add_row_wh1_transfer_form(self, table):
         try:
