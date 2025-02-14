@@ -3,32 +3,32 @@ from tkinter import Canvas, StringVar
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 
-from wh1_receivingreport import Wh1ReceivingReport
-from wh1_transfer_form import Wh1TransferForm
-from wh1_outgoingreport import Wh1OutgoingReport
-from wh1_preparation_form import Wh1PreparationForm
-from add_material_code import AddMaterialCode
+from Warehouse1.wh1_receivingreport import Wh1ReceivingReport
+from Warehouse1.wh1_transfer_form import Wh1TransferForm
+from Warehouse1.wh1_outgoingreport import Wh1OutgoingReport
+from Warehouse1.wh1_preparation_form import Wh1PreparationForm
+from Warehouse1.add_material_code import AddMaterialCode
 
-from Spreadsheet_wh2 import Spreadsheet2
-from wh2_receivingreport import Wh2ReceivingReport
-from wh2_transfer_form import Wh2TransferForm
-from wh2_outgoingreport import Wh2OutgoingReport
-from wh2_preparation_form import Wh2PreparationForm
-from wh2_add_material_code import Wh2AddMaterialCode
+from Warehouse2.Spreadsheet_wh2 import Spreadsheet2
+from Warehouse2.wh2_receivingreport import Wh2ReceivingReport
+from Warehouse2.wh2_transfer_form import Wh2TransferForm
+from Warehouse2.wh2_outgoingreport import Wh2OutgoingReport
+from Warehouse2.wh2_preparation_form import Wh2PreparationForm
+from Warehouse2.wh2_add_material_code import Wh2AddMaterialCode
 
-from Spreadsheet_wh4 import Spreadsheet4
-from wh4_receiving_report import Wh4ReceivingReport
-from wh4_transfer_form import Wh4TransferForm
-from wh4_outgoingreport import Wh4OutgoingReport
-from wh4_preparation_form import Wh4PreparationForm
-from wh4_add_material import Wh4AddMaterialCode
+from Warehouse4.Spreadsheet_wh4 import Spreadsheet4
+from Warehouse4.wh4_receiving_report import Wh4ReceivingReport
+from Warehouse4.wh4_transfer_form import Wh4TransferForm
+from Warehouse4.wh4_outgoingreport import Wh4OutgoingReport
+from Warehouse4.wh4_preparation_form import Wh4PreparationForm
+from Warehouse4.wh4_add_material import Wh4AddMaterialCode
 
-from Spreedsheet_wh1 import Spreadsheet1
+from Warehouse1.Spreedsheet_wh1 import Spreadsheet1
 from Notes import Notes
 import datetime
 
+
 class MainApp:
-    #sadjfhaskjasdasdasdasd hello
     def __init__(self):
         self.themes = [
             "solar", "cyborg", "darkly", "superhero", "vapor",  # Dark themes
