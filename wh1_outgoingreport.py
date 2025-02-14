@@ -1,42 +1,10 @@
 import psycopg2
-import ttkbootstrap as ttk
+import ttkbootstrap as ttk  # Use ttk from ttkbootstrap
 from tkinter import messagebox
-from ttkbootstrap.constants import *
-from tkinter import messagebox, Canvas, Scrollbar, Frame
+from date_format import format_date_input
+import tkinter as tk
 
-def format_date_input(event):
-    """Format date as MM/DD/YYYY while the user types."""
-    entry = event.widget
-    date_text = entry.get().replace("/", "")  # Remove existing slashes
-    formatted_date = ""
 
-    # Format the input step by step
-    if len(date_text) >= 1:
-        formatted_date += date_text[:2]  # Add MM
-    if len(date_text) > 2:
-        formatted_date += "/" + date_text[2:4]  # Add DD
-    if len(date_text) > 4:
-        formatted_date += "/" + date_text[4:8]  # Add YYYY
-
-    # Prevent accidental deletion of text
-    cursor_position = entry.index("insert")  # Save the cursor position
-    entry.delete(0, "end")
-    entry.insert(0, formatted_date[:10])  # Limit to MM/DD/YYYY
-
-    # Restore the cursor position
-    if cursor_position < len(formatted_date):
-        entry.icursor(cursor_position)
-
-    # Optional: Validate MM, DD, YYYY ranges
-    try:
-        if len(date_text) == 8:
-            mm, dd, yyyy = int(date_text[:2]), int(date_text[2:4]), int(date_text[4:])
-            if not (1 <= mm <= 12):
-                raise ValueError("Invalid month")
-            if not (1 <= dd <= 31):
-                raise ValueError("Invalid day")
-    except ValueError:
-        messagebox.showerror("Invalid Date", "Please enter a valid date in MM/DD/YYYY format.")
 
 class Wh1OutgoingReport:
     def __init__(self):
@@ -52,7 +20,7 @@ class Wh1OutgoingReport:
                 self.conn = psycopg2.connect(
                     host="192.168.1.13",
                     port=5432,
-                    dbname="SOHinventory",
+                    dbname="Inventory",
                     user="postgres",
                     password="mbpi"
                 )
@@ -88,7 +56,8 @@ class Wh1OutgoingReport:
                        wh1_outgoing_report.area_location 
                 FROM wh1_outgoing_report
                 INNER JOIN material_codes
-                    ON wh1_outgoing_report.material_code = material_codes.mid;
+                    ON wh1_outgoing_report.material_code = material_codes.mid
+                WHERE wh1_outgoing_report.deleted = FALSE;
             """
             self.cursor.execute(query)
             return self.cursor.fetchall()
@@ -116,14 +85,14 @@ class Wh1OutgoingReport:
         style = ttk.Style()
         style.configure(
             "Custom.TLabel",
-            background="#3e3f3a",  # Background color
-            foreground="white",  # Font color
+            background="white",  # Background color
+            foreground="black",  # Font color
             font=("Arial", 30, "bold"),  # Font style and size
             anchor="center"  # Text alignment
         )
 
         # Title Label (with the custom style)
-        label = ttk.Label(parent_frame, text="Outgoing Report", style="Custom.TLabel")
+        label = ttk.Label(parent_frame, text="Warehouse 1: Outgoing Report", style="Custom.TLabel")
         label.grid(row=0, column=0, columnspan=2, pady=5, sticky="ew")
 
         # Search Bar Frame
@@ -189,8 +158,16 @@ class Wh1OutgoingReport:
                 date_entry.bind("<KeyRelease>", format_date_input)  # Bind the formatting function
                 wh1_outgoing_report_entries.append(date_entry)
             elif label_text == "Material Code":
-                combobox = ttk.Combobox(entry_frame, values=material_codes, width=15)
+                def to_uppercase(*args):
+                    combobox_var.set(combobox_var.get().upper())  # Convert input to uppercase
+
+                combobox_var = tk.StringVar()
+                combobox = ttk.Combobox(entry_frame, values=material_codes, width=15, textvariable=combobox_var)
                 combobox.grid(row=1, column=i, padx=10, pady=5)
+
+                # Trace changes and enforce uppercase
+                combobox_var.trace_add("write", to_uppercase)
+
                 wh1_outgoing_report_entries.append(combobox)
             else:
                 entry = ttk.Entry(entry_frame, width=15)
@@ -227,6 +204,17 @@ class Wh1OutgoingReport:
         )
         delete_button.grid(row=0, column=2, padx=5)
 
+        clear_button = ttk.Button(
+            button_frame,
+            text="Clear",
+            command=lambda: self.clear_row_wh1_outgoing_report(wh1_outgoing_report, clear_ui_only=True),
+            width=10
+        )
+        clear_button.grid(row=0, column=3, padx=5)
+
+        # Disable the button
+        clear_button.config(state="disabled")
+
         # Center Table, Labels, and Entry Fields
         parent_frame.grid_columnconfigure(0, weight=1)
         parent_frame.grid_rowconfigure(2, weight=1)
@@ -255,7 +243,7 @@ class Wh1OutgoingReport:
 
             # Ensure quantity is a valid integer
             try:
-                quantity = int(quantity)  # Convert to integer
+                quantity = float(quantity)  # Convert to integer
             except ValueError:
                 messagebox.showwarning("Invalid Input", "Quantity must be a number.")
                 return
@@ -274,7 +262,7 @@ class Wh1OutgoingReport:
             # Insert a new row into PostgreSQL (wh1_outgoing_report table)
             query = """INSERT INTO wh1_outgoing_report (reference_no, date_outgoing, material_code, quantity, area_location) 
                        VALUES (%s, %s, %s, %s, %s)"""
-            values = (reference_no, date_outgoing, material_code_id, quantity, area_location)
+            values = (reference_no, date_outgoing, material_code_id, quantity, f"Warehouse {area_location}")
             self.cursor.execute(query, values)
             self.conn.commit()
 
@@ -293,7 +281,7 @@ class Wh1OutgoingReport:
 
     def update_row_wh1_outgoing_report(self, table):
         try:
-            self.connect_db()  # Ensure the connection is open
+            self.connect_db()  # Ensure the database connection is open
 
             # Get selected row
             selected_item = table.selection()
@@ -301,107 +289,177 @@ class Wh1OutgoingReport:
                 messagebox.showwarning("No Selection", "Please select a row to update.")
                 return
 
-            # Retrieve values from entry fields for Table 1
-            reference_no = self.wh1_outgoing_report_entries[0].get()
-            date_outgoing = self.wh1_outgoing_report_entries[1].get()
-            material_code = self.wh1_outgoing_report_entries[2].get()
-            quantity = self.wh1_outgoing_report_entries[3].get()
-            area_location = self.wh1_outgoing_report_entries[4].get()
+            # Extract reference_no from selected row (assuming it's the first column)
+            selected_values = table.item(selected_item, "values")
+            reference_no = selected_values[0].strip()  # Ensure no leading/trailing spaces
 
-            # Get material_code_id from the material_codes table
-            get_material_id = "SELECT mid FROM material_codes WHERE material_code = %s"
-            self.cursor.execute(get_material_id, (material_code,))
-            material_code_id = self.cursor.fetchone()
+            # Fetch ID from the database using reference_no
+            self.cursor.execute("SELECT id FROM wh1_outgoing_report WHERE reference_no = %s", (reference_no,))
+            result = self.cursor.fetchone()
 
-            # Construct the query dynamically based on which fields have values
+            if not result:
+                messagebox.showerror("Error", "No matching record found in the database.")
+                return
+
+            row_id = result[0]  # Extract the ID
+
+            # Retrieve values from entry fields (only update non-empty fields)
+            date_outgoing = self.wh1_outgoing_report_entries[1].get().strip()
+            material_code = self.wh1_outgoing_report_entries[2].get().strip()
+            quantity = self.wh1_outgoing_report_entries[3].get().strip()
+            area_location = self.wh1_outgoing_report_entries[4].get().strip()
+
+            # Get material_code_id from the material_codes table (if material_code is provided)
+            material_code_id = None
+            if material_code:
+                self.cursor.execute("SELECT mid FROM material_codes WHERE material_code = %s", (material_code,))
+                result = self.cursor.fetchone()
+                if result:
+                    material_code_id = result[0]  # Extract the integer ID
+
+            # Construct the update query dynamically based on non-empty fields
             query = "UPDATE wh1_outgoing_report SET "
             values = []
 
-            # Only add fields that have values
-            if reference_no:
-                query += "reference_no = %s, "
-                values.append(reference_no)
             if date_outgoing:
                 query += "date_outgoing = %s, "
                 values.append(date_outgoing)
-            if material_code:
+            if material_code_id:
                 query += "material_code = %s, "
                 values.append(material_code_id)
             if quantity:
                 query += "quantity = %s, "
-                values.append(int(quantity))  # Ensure quantity is an integer
+                values.append(float(quantity))  # Ensure it's stored as a float
             if area_location:
                 query += "area_location = %s, "
                 values.append(area_location)
 
+            # Ensure at least one field is being updated
+            if not values:
+                messagebox.showwarning("No Changes", "No new values provided to update.")
+                return
+
             # Remove trailing comma and space
             query = query.rstrip(", ")
 
-            # Use reference_no as the unique identifier (ID) in the WHERE clause
-            query += " WHERE reference_no = %s"
-            values.append(reference_no)
+            # Add WHERE clause to update only the selected row based on ID
+            query += " WHERE id = %s"
+            values.append(row_id)  # Use the fetched ID
 
-            # Execute the query
+            # Execute the update query
             self.cursor.execute(query, tuple(values))
             self.conn.commit()
 
-            messagebox.showinfo("Success", "Row updated successfully in Table 1.")
+            messagebox.showinfo("Success", "Selected row updated successfully.")
 
-            # Refresh the Treeview to show updated data
-            data_wh1_outgoing_report = self.fetch_data_from_wh1_outgoing_report()
-            self.update_treeview(table, data_wh1_outgoing_report,
+            # Refresh the Treeview to reflect the changes
+            updated_data = self.fetch_data_from_wh1_outgoing_report()
+            self.update_treeview(table, updated_data,
                                  ["Reference No.", "Date Outgoing", "Material Code", "Quantity", "Area Location"])
 
         except Exception as e:
-            messagebox.showerror("Error", f"Error while updating row in Table 1: {e}")
-            self.conn.rollback()  # Rollback the transaction if there's an error
+            messagebox.showerror("Error", f"Error while updating the row: {e}")
+            self.conn.rollback()  # Rollback in case of an error
         finally:
             self.close_connection()
 
     def delete_row_wh1_outgoing_report(self, table):
+        """Permanently delete the selected row using its unique 'id' fetched from PostgreSQL."""
         try:
-            self.connect_db()  # Ensure the connection is open
+            self.connect_db()  # Ensure the database connection is open
 
-            # Get selected row
+            # Get selected row from Treeview
             selected_item = table.selection()
             if not selected_item:
                 messagebox.showwarning("No Selection", "Please select a row to delete.")
                 return
 
-            # Get the reference_no (used as the unique identifier) of the selected row
-            reference_no = table.item(selected_item)['values'][0]  # Assuming first column is reference_no (text)
+            # Extract row values from Treeview
+            row_values = table.item(selected_item, "values")
+            print("Row values:", row_values)  # Debugging step to check values
 
-            # Debugging: Check the reference_no value
-            print(f"Selected Reference No: {reference_no}")
+            if not row_values:
+                messagebox.showerror("Error", "No row data found. Please try again.")
+                return
 
-            # Ask for confirmation
-            confirm = messagebox.askyesno("Confirm Delete",
-                                          f"Are you sure you want to delete the row with Reference No: {reference_no}?")
+            # Extract reference_no and displayed material_code from Treeview
+            reference_no = row_values[0]  # Reference Number
+            material_code_str = row_values[2]  # Material Code (as displayed in Treeview)
+
+            # Fetch the actual 'mid' (integer) from the material_codes table
+            query = "SELECT mid FROM material_codes WHERE material_code = %s LIMIT 1;"
+            self.cursor.execute(query, (material_code_str,))
+            result = self.cursor.fetchone()
+
+            if not result:
+                messagebox.showerror("Error", f"No matching material code '{material_code_str}' found in database.")
+                return
+
+            material_code = result[0]  # Get the integer 'mid'
+
+            # Fetch the unique 'id' from wh1_receiving_report
+            query = "SELECT id FROM wh1_outgoing_report WHERE reference_no = %s AND material_code = %s LIMIT 1;"
+            self.cursor.execute(query, (reference_no, material_code))
+            result = self.cursor.fetchone()
+
+            if not result:
+                messagebox.showerror("Error", "No matching record found in the database.")
+                return
+
+            row_id = result[0]  # Extract the actual ID from the query result
+
+            # Confirm deletion
+            confirm = messagebox.askyesno("Confirm Deletion",
+                                          f"Are you sure you want to permanently delete row ID {row_id}?")
             if not confirm:
                 return
 
-            # Ensure reference_no is treated as text (explicitly casting to TEXT in SQL)
-            query = "DELETE FROM wh1_outgoing_report WHERE reference_no = %s::TEXT"
-
-            # Debugging: Check the query and parameter
-            print(f"SQL Query: {query} - Reference No: {reference_no}")
-
-            # Execute the delete query
-            self.cursor.execute(query, (reference_no,))  # Treat reference_no as text
+            # Perform hard delete (permanent)
+            query = "DELETE FROM wh1_outgoing_report WHERE id = %s;"
+            self.cursor.execute(query, (row_id,))
             self.conn.commit()
 
-            messagebox.showinfo("Success", f"Row with Reference No: {reference_no} deleted successfully.")
+            # Remove the row from the Treeview
+            table.delete(selected_item)
 
-            # Refresh the Treeview to show the updated data
-            data_wh1_outgoing_report = self.fetch_data_from_wh1_outgoing_report()
-            self.update_treeview(table, data_wh1_outgoing_report,
-                                 ["Reference No.", "Date Outgoing", "Material Code", "Quantity", "Area Location"])
+            messagebox.showinfo("Success", f"Row ID {row_id} permanently deleted.")
 
         except Exception as e:
-            messagebox.showerror("Error", f"Error while deleting row in Table 1: {e}")
-            self.conn.rollback()  # Rollback the transaction if there's an error
+            messagebox.showerror("Error", f"Error while deleting row: {e}")
+            print("Error while deleting row:", e)
+            self.conn.rollback()
         finally:
             self.close_connection()
+
+    def clear_row_wh1_outgoing_report(self, table, clear_ui_only=True):
+        """
+        Mark all rows as deleted (flagging rows in the UI and database).
+        The `clear_ui_only` flag determines if only the UI should be cleared or if other actions are required.
+        """
+        try:
+            # Confirm if the user wants to clear all rows from the UI
+            confirm = messagebox.askyesno("Confirm Clear", "Are you sure you want to mark all rows as deleted?")
+            if not confirm:
+                return
+
+            if clear_ui_only:
+                # Clear all rows from the Treeview (UI)
+                table.delete(*table.get_children())  # This removes all the rows in the table.
+                messagebox.showinfo("Success", "All rows have been cleared from the table (UI only).")
+
+                # Mark rows as deleted in the database
+                query = "UPDATE wh1_outgoing_report SET deleted = TRUE WHERE deleted = FALSE;"
+                self.cursor.execute(query)
+                self.conn.commit()
+                messagebox.showinfo("Database Update", "All rows have been marked as deleted in the database.")
+            else:
+                # Add any other action here based on the flag if needed
+                messagebox.showinfo("Action",
+                                    "Flag set to False, performing another action (can be clearing DB or anything).")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Error while clearing rows: {e}")
+            self.conn.rollback()  # Rollback the transaction if there's an error
 
     def search_table(self, table, search_text):
         """Filter the table based on the search text."""
@@ -415,13 +473,15 @@ class Wh1OutgoingReport:
 
             # Query the database for matching results, casting columns to text for ILIKE
             query = """
-            SELECT reference_no, 
-                   TO_CHAR(date_outgoing, 'MM/DD/YYYY') AS date_outgoing, 
-                   material_code, 
-                   quantity, 
-                   area_location 
-            FROM wh1_outgoing_report
-            WHERE reference_no::TEXT ILIKE %s OR material_code::TEXT ILIKE %s;
+            SELECT 
+                wor.reference_no, 
+                TO_CHAR(wor.date_outgoing, 'MM/DD/YYYY') AS date_outgoing, 
+                mc.material_code, 
+                wor.quantity, 
+                wor.area_location 
+            FROM wh1_outgoing_report wor
+            JOIN material_codes mc ON wor.material_code = mc.mid  -- Updated JOIN condition
+            WHERE wor.reference_no::TEXT ILIKE %s OR mc.material_code::TEXT ILIKE %s;
             """
             self.cursor.execute(query, (f"%{search_text}%", f"%{search_text}%"))
             results = self.cursor.fetchall()
