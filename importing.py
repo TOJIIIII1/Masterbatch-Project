@@ -1,7 +1,7 @@
 import pandas as pd
 import psycopg2
 
-
+#This is for fast importing of data for the beginning balance
 
 # Function to get raw material ID from the database
 def get_raw_material_id(rm_code):

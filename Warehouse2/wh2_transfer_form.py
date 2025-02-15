@@ -339,60 +339,88 @@ class Wh2TransferForm:
                 messagebox.showwarning("No Selection", "Please select a row to update.")
                 return
 
-            # Retrieve values from entry fields for Table 1
-            reference_no = self.wh2_transfer_form_entries[0].get()
-            date = self.wh2_transfer_form_entries[1].get()
-            material_code = self.wh2_transfer_form_entries[2].get()
-            quantity = self.wh2_transfer_form_entries[3].get()
-            area_to = self.wh2_transfer_form_entries[4].get()
+            # Extract reference_no from the selected row (assuming it's the first column)
+            selected_values = table.item(selected_item, "values")
+            reference_no = selected_values[0].strip() if selected_values else None
 
-            # Get material_code_id from the material_codes table
-            get_material_id = "SELECT mid FROM material_codes WHERE material_code = %s"
-            self.cursor.execute(get_material_id, (material_code,))
-            material_code_id = self.cursor.fetchone()
+            if not reference_no:
+                messagebox.showerror("Error", "Failed to get Reference No. from the selected row.")
+                return
 
-            # Construct the query dynamically based on which fields have values
+            # Retrieve values from entry fields
+            date = self.wh2_transfer_form_entries[1].get().strip()
+            material_code = self.wh2_transfer_form_entries[2].get().strip()
+            quantity = self.wh2_transfer_form_entries[3].get().strip()
+            area_to = self.wh2_transfer_form_entries[4].get().strip()
+
+            # Append "Warehouse" to area_to if it's not empty
+            if area_to:
+                area_to = f"Warehouse {area_to}"
+
+            # Get material_code_id from the material_codes table (if material_code is provided)
+            material_code_id = None
+            if material_code:
+                self.cursor.execute("SELECT mid FROM wh2_material_codes WHERE material_code = %s", (material_code,))
+                result = self.cursor.fetchone()
+                if result:
+                    material_code_id = result[0]  # Extract the integer ID
+
+            # Construct the update query dynamically based on non-empty fields
             query = "UPDATE wh2_transfer_form SET "
             values = []
 
-            # Only add fields that have values
-            if reference_no:
-                query += "reference_no = %s, "
-                values.append(reference_no)
             if date:
                 query += "date = %s, "
                 values.append(date)
-            if material_code:
+            if material_code_id:
                 query += "material_code = %s, "
                 values.append(material_code_id)
             if quantity:
                 query += "quantity = %s, "
-                values.append(float(quantity))  # Ensure quantity is an integer
+                values.append(float(quantity))  # Ensure quantity is stored as a float
             if area_to:
                 query += "area_to = %s, "
                 values.append(area_to)
 
+            # Ensure at least one field is being updated
+            if not values:
+                messagebox.showwarning("No Changes", "No new values provided to update.")
+                return
+
             # Remove trailing comma and space
             query = query.rstrip(", ")
 
-            # Use reference_no as the unique identifier (ID) in the WHERE clause
+            # Add WHERE clause to update only the selected row based on reference_no
             query += " WHERE reference_no = %s"
             values.append(reference_no)
 
-            # Execute the query
+            # Execute the update query
             self.cursor.execute(query, tuple(values))
             self.conn.commit()
 
-            messagebox.showinfo("Success", "Row updated successfully in Table 1.")
+            messagebox.showinfo("Success", "Selected row updated successfully.")
 
-            # Refresh the Treeview to show updated data
-            data_wh2_transfer_form = self.fetch_data_from_wh2_transfer_form()
-            self.update_treeview(table, data_wh2_transfer_form,
-                                 ["Reference No.", "Date Received", "Material Code", "Quantity", "Area To"])
+            # ✅ Update only the modified row in Treeview to retain order
+            updated_values = list(selected_values)  # Convert tuple to list
+            if date:
+                updated_values[1] = date
+            if material_code:
+                updated_values[2] = material_code
+            if quantity:
+                updated_values[3] = quantity
+            if area_to:
+                updated_values[4] = area_to
+
+            # ✅ Update the selected row instead of refreshing the whole table
+            table.item(selected_item, values=updated_values)
+
+            # ✅ Ensure the row remains selected after updating
+            table.selection_set(selected_item)
+            table.focus(selected_item)
 
         except Exception as e:
-            messagebox.showerror("Error", f"Error while updating row in Table 1: {e}")
-            self.conn.rollback()  # Rollback the transaction if there's an error
+            messagebox.showerror("Error", f"Error while updating the row: {e}")
+            self.conn.rollback()  # Rollback in case of an error
         finally:
             self.close_connection()
 

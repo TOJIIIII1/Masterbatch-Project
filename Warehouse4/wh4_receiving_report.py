@@ -302,6 +302,10 @@ class Wh4ReceivingReport:
             quantity = self.wh4_receiving_report_entries[3].get().strip()
             area_location = self.wh4_receiving_report_entries[4].get().strip()
 
+            # Append "Warehouse" to area_location if not empty
+            if area_location:
+                area_location = f"Warehouse {area_location}"
+
             # Get material_code_id from the material_codes table (if material_code is provided)
             material_code_id = None
             if material_code:
@@ -345,10 +349,23 @@ class Wh4ReceivingReport:
 
             messagebox.showinfo("Success", "Selected row updated successfully.")
 
-            # Refresh the Treeview to reflect the changes
-            updated_data = self.fetch_data_from_wh4_receiving_report()
-            self.update_treeview(table, updated_data,
-                                 ["Reference No.", "Date Received", "Material Code", "Quantity", "Area Location"])
+            # ✅ Update only the modified row in Treeview to retain order
+            updated_values = list(selected_values)  # Convert tuple to list
+            if date_received:
+                updated_values[1] = date_received
+            if material_code:
+                updated_values[2] = material_code
+            if quantity:
+                updated_values[3] = quantity
+            if area_location:
+                updated_values[4] = area_location
+
+            # ✅ Update the selected row instead of clearing the whole table
+            table.item(selected_item, values=updated_values)
+
+            # ✅ Ensure the row remains selected after updating
+            table.selection_set(selected_item)
+            table.focus(selected_item)
 
         except Exception as e:
             messagebox.showerror("Error", f"Error while updating the row: {e}")

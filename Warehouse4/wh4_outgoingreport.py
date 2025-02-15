@@ -289,7 +289,11 @@ class Wh4OutgoingReport:
 
             # Extract reference_no from selected row (assuming it's the first column)
             selected_values = table.item(selected_item, "values")
-            reference_no = selected_values[0].strip()  # Ensure no leading/trailing spaces
+            reference_no = selected_values[0].strip() if selected_values else None
+
+            if not reference_no:
+                messagebox.showerror("Error", "Failed to get Reference No. from the selected row.")
+                return
 
             # Fetch ID from the database using reference_no
             self.cursor.execute("SELECT id FROM wh4_outgoing_report WHERE reference_no = %s", (reference_no,))
@@ -306,6 +310,10 @@ class Wh4OutgoingReport:
             material_code = self.wh4_outgoing_report_entries[2].get().strip()
             quantity = self.wh4_outgoing_report_entries[3].get().strip()
             area_location = self.wh4_outgoing_report_entries[4].get().strip()
+
+            # Append "Warehouse" to area_location if not empty
+            if area_location:
+                area_location = f"Warehouse {area_location}"
 
             # Get material_code_id from the material_codes table (if material_code is provided)
             material_code_id = None
@@ -350,10 +358,23 @@ class Wh4OutgoingReport:
 
             messagebox.showinfo("Success", "Selected row updated successfully.")
 
-            # Refresh the Treeview to reflect the changes
-            updated_data = self.fetch_data_from_wh4_outgoing_report()
-            self.update_treeview(table, updated_data,
-                                 ["Reference No.", "Date Outgoing", "Material Code", "Quantity", "Area Location"])
+            # ✅ Update only the modified row in Treeview to retain order
+            updated_values = list(selected_values)  # Convert tuple to list
+            if date_outgoing:
+                updated_values[1] = date_outgoing
+            if material_code:
+                updated_values[2] = material_code
+            if quantity:
+                updated_values[3] = quantity
+            if area_location:
+                updated_values[4] = area_location
+
+            # ✅ Update the selected row instead of clearing the whole table
+            table.item(selected_item, values=updated_values)
+
+            # ✅ Ensure the row remains selected after updating
+            table.selection_set(selected_item)
+            table.focus(selected_item)
 
         except Exception as e:
             messagebox.showerror("Error", f"Error while updating the row: {e}")
