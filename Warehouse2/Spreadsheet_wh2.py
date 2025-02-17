@@ -15,7 +15,7 @@ class Spreadsheet2:
         """Connect to the PostgreSQL database."""
         try:
             self.conn = psycopg2.connect(
-                host="localhost",  # Replace with your database host
+                host="192.168.1.224",  # Replace with your database host
                 port=5432,  # Replace with your database port
                 dbname="Inventory",  # Replace with your database name
                 user="postgres",  # Replace with your username

@@ -13,7 +13,7 @@ class AddMaterialCode:
         """Connect to the PostgreSQL database."""
         try:
             self.conn = psycopg2.connect(
-                host="localhost",
+                host="192.168.1.224",
                 port=5432,
                 dbname="Inventory",
                 user="postgres",
