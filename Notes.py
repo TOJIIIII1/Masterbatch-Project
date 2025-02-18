@@ -21,7 +21,7 @@ class Notes:
         try:
             if self.conn is None or self.conn.closed != 0:
                 self.conn = psycopg2.connect(
-                    host="192.168.1.224",
+                    host="localhost",
                     port=5432,
                     dbname="Inventory",
                     user="postgres",
@@ -303,24 +303,32 @@ class Notes:
             return
 
         try:
-            # Create custom rows
+            # Create custom headers
             top_row_1 = ["Daily Ending Inventory Report From:", f"{yesterday_date}", "", ""]
             top_row_2 = ["List of Batches Included in Report", "", "", ""]
             top_row_3 = ["MASTERBATCH", "", "", ""]
+            top_row_4 = ["PRODUCT CODE", "LOT#", "Product Kind", ""]
+
+            # Insert headers at the beginning of the data list
             data.insert(0, top_row_1)
             data.insert(1, top_row_2)
             data.insert(2, top_row_3)
+            data.insert(3, top_row_4)
 
-            # Write Treeview data to Excel
+            # Define column names for Treeview data
             columns = ["Product Code", "Lot Number", "Product Kind"]
-            df = pd.DataFrame(data[3:], columns=columns)
-            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
-                # Treeview data sheet
-                df.to_excel(writer, index=False, header=False, startrow=3, sheet_name="CustomData")
-                sheet = writer.sheets['CustomData']
 
-                for row_num, row_data in enumerate([top_row_1, top_row_2, top_row_3], 1):
-                    for col_num, value in enumerate(row_data, 1):
+            # Convert the remaining data (excluding first 4 rows) to a DataFrame
+            df = pd.DataFrame(data[4:], columns=columns)
+
+            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                # Write the data (starting from row 5 in Excel)
+                df.to_excel(writer, index=False, header=False, startrow=4, sheet_name="NOTES")
+                sheet = writer.sheets['NOTES']
+
+                # Write header rows manually
+                for row_num, row_data in enumerate([top_row_1, top_row_2, top_row_3, top_row_4], start=1):
+                    for col_num, value in enumerate(row_data, start=1):
                         sheet.cell(row=row_num, column=col_num, value=value)
 
                 # Function to auto-adjust column widths
@@ -340,21 +348,24 @@ class Notes:
                 query_whse1 = """
                     SELECT DISTINCT
                         m.material_code,   
-                        0 AS number_of_bags,  -- Force Number of Bags to be 0
-                        COALESCE(m.qty_per_packing, 0) AS qty_per_packing,
-                        0 AS whse1_excess,  -- Set WHSE #1 - Excess to 0
-                        COALESCE(mt.total_quantity, 0) AS totals,  -- Ensure totals are retrieved correctly
-                        COALESCE(mt.status, 'Good') AS status  -- Get status from wh1_material_code_totals
+                        'NaN'::FLOAT AS number_of_bags,  -- PostgreSQL only (for FLOAT/NUMERIC)
+                        'NaN'::FLOAT AS qty_per_packing,
+                        'NaN'::FLOAT AS whse1_excess,
+                        ROUND(COALESCE(mt.total_quantity, 0)::NUMERIC, 2) AS totals,  -- Cast to NUMERIC and round to 2 decimal places
+                        CASE
+                            WHEN COALESCE(mt.status, 'Good') = 'Good' THEN NULL  -- Make status blank if it's 'Good'
+                            ELSE COALESCE(mt.status, 'Good')  -- Otherwise, keep the original status
+                        END AS status  
                     FROM 
                         material_codes AS m
                     LEFT JOIN 
-                        wh1_material_code_totals AS mt ON m.mid = mt.ID  -- Single join, no duplicate
+                        wh1_material_code_totals AS mt ON m.mid = mt.ID  
                     LEFT JOIN 
                         wh1_transfer_form AS wtf ON m.mid = wtf.material_code
                     LEFT JOIN 
                         wh1_receiving_report AS wrr ON m.mid = wrr.material_code
                     WHERE 
-                        COALESCE(mt.total_quantity, 0) > 0  -- Ensure only rows with quantity > 0
+                        COALESCE(mt.total_quantity, 0) > 0  
                     ORDER BY 
                         m.material_code, status ASC;
                 """
@@ -364,28 +375,31 @@ class Notes:
                 df_whse1 = pd.DataFrame(data_whse1,
                                         columns=[f"{yesterday_date}", "No of Bags", "Qty per Packing",
                                                  "WHSE #1 - Excess", "Total", "Status"])
-                df_whse1.to_excel(writer, sheet_name="whse1", index=False)
-                auto_adjust_column_width(writer.sheets["whse1"])  # Auto-adjust column widths
+                df_whse1.to_excel(writer, sheet_name="WHSE1", index=False)
+                auto_adjust_column_width(writer.sheets["WHSE1"])  # Auto-adjust column widths
 
                 # Export Warehouse 2 data
                 query_whse2 = """
                     SELECT DISTINCT
                         m.material_code,   
-                        0 AS number_of_bags,  -- Force Number of Bags to be 0
-                        COALESCE(m.qty_per_packing, 0) AS qty_per_packing,
-                        0 AS whse1_excess,  -- Set WHSE #1 - Excess to 0
-                        COALESCE(mt.total_quantity, 0) AS totals,  -- Ensure totals are retrieved correctly
-                        COALESCE(mt.status, 'Good') AS status  -- Get status from wh2_material_code_totals
+                        'NaN'::FLOAT AS number_of_bags,  -- PostgreSQL only (for FLOAT/NUMERIC)
+                        'NaN'::FLOAT AS qty_per_packing,
+                        'NaN'::FLOAT AS whse1_excess,
+                        ROUND(COALESCE(mt.total_quantity, 0)::NUMERIC, 2) AS totals,  -- Cast to NUMERIC and round to 2 decimal places
+                        CASE
+                            WHEN COALESCE(mt.status, 'Good') = 'Good' THEN NULL  -- Make status blank if it's 'Good'
+                            ELSE COALESCE(mt.status, 'Good')  -- Otherwise, keep the original status
+                        END AS status  
                     FROM 
                         wh2_material_codes AS m
                     LEFT JOIN 
-                        wh2_material_code_totals AS mt ON m.mid = mt.ID  -- Single join, no duplicate
+                        wh2_material_code_totals AS mt ON m.mid = mt.ID  
                     LEFT JOIN 
                         wh2_transfer_form AS wtf ON m.mid = wtf.material_code
                     LEFT JOIN 
                         wh2_receiving_report AS wrr ON m.mid = wrr.material_code
                     WHERE 
-                        COALESCE(mt.total_quantity, 0) > 0  -- Ensure only rows with quantity > 0
+                        COALESCE(mt.total_quantity, 0) > 0  
                     ORDER BY 
                         m.material_code, status ASC;
                 """
@@ -395,28 +409,31 @@ class Notes:
                 df_whse2 = pd.DataFrame(data_whse2,
                                         columns=[f"{yesterday_date}", "No of Bags", "Qty per Packing",
                                                  "WHSE #1 - Excess", "Total", "Status"])
-                df_whse2.to_excel(writer, sheet_name="whse2", index=False)
-                auto_adjust_column_width(writer.sheets["whse2"])  # Auto-adjust column widths
+                df_whse2.to_excel(writer, sheet_name="WHSE2", index=False)
+                auto_adjust_column_width(writer.sheets["WHSE2"])  # Auto-adjust column widths
 
                 # Export Warehouse 4 data
                 query_whse4 = """
                     SELECT DISTINCT
                         m.material_code,   
-                        0 AS number_of_bags,  -- Force Number of Bags to be 0
-                        COALESCE(m.qty_per_packing, 0) AS qty_per_packing,
-                        0 AS whse4_excess,  -- Set WHSE #4 - Excess to 0
-                        COALESCE(mt.total_quantity, 0) AS totals,  -- Ensure totals are retrieved correctly
-                        COALESCE(mt.status, 'Good') AS status  -- Get status from wh4_material_code_totals
+                        'NaN'::FLOAT AS number_of_bags,  -- PostgreSQL only (for FLOAT/NUMERIC)
+                        'NaN'::FLOAT AS qty_per_packing,
+                        'NaN'::FLOAT AS whse1_excess,
+                        ROUND(COALESCE(mt.total_quantity, 0)::NUMERIC, 2) AS totals,  -- Cast to NUMERIC and round to 2 decimal places
+                        CASE
+                            WHEN COALESCE(mt.status, 'Good') = 'Good' THEN NULL  -- Make status blank if it's 'Good'
+                            ELSE COALESCE(mt.status, 'Good')  -- Otherwise, keep the original status
+                        END AS status  
                     FROM 
                         wh4_material_codes AS m
                     LEFT JOIN 
-                        wh4_material_code_totals AS mt ON m.mid = mt.ID  -- Single join, no duplicate
+                        wh4_material_code_totals AS mt ON m.mid = mt.ID  
                     LEFT JOIN 
                         wh4_transfer_form AS wtf ON m.mid = wtf.material_code
                     LEFT JOIN 
                         wh4_receiving_report AS wrr ON m.mid = wrr.material_code
                     WHERE 
-                        COALESCE(mt.total_quantity, 0) > 0  -- Ensure only rows with quantity > 0
+                        COALESCE(mt.total_quantity, 0) > 0  
                     ORDER BY 
                         m.material_code, status ASC;
                 """
@@ -425,8 +442,8 @@ class Notes:
                 df_whse4 = pd.DataFrame(data_whse4,
                                         columns=[f"{yesterday_date}", "No of Bags", "Qty per Packing",
                                                  "WHSE #4 - Excess", "Total", "Status"])
-                df_whse4.to_excel(writer, sheet_name="whse4", index=False)
-                auto_adjust_column_width(writer.sheets["whse4"])  # Auto-adjust column widths
+                df_whse4.to_excel(writer, sheet_name="WHSE4", index=False)
+                auto_adjust_column_width(writer.sheets["WHSE4"])  # Auto-adjust column widths
 
             messagebox.showinfo("Success", f"Data successfully exported to {file_path}")
         except Exception as e:

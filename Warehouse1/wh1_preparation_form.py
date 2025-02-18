@@ -18,7 +18,7 @@ class Wh1PreparationForm:
             if self.conn is None or self.conn.closed != 0:
                 # Reconnect to the database if the connection is closed
                 self.conn = psycopg2.connect(
-                    host="192.168.1.224",
+                    host="localhost",
                     port=5432,
                     dbname="Inventory",
                     user="postgres",
@@ -263,7 +263,7 @@ class Wh1PreparationForm:
             self.cursor.execute(query, values)
             self.conn.commit()
 
-            messagebox.showinfo("Success", "Row added successfully to Table 1.")
+            messagebox.showinfo("Success", "Row added successfully to Warehouse 1: Preparation Form.")
 
             # After adding the row, refresh the Treeview to show the updated data
             data_wh1_preparation_form = self.fetch_data_from_wh1_preparation_form()
@@ -271,7 +271,7 @@ class Wh1PreparationForm:
                                  ["Reference No.", "Date Received", "Material Code", "Quantity Prepared", "Quantity Return", "Area Location"])
 
         except Exception as e:
-            messagebox.showerror("Error", f"Error while adding row to Table 1: {e}")
+            messagebox.showerror("Error", f"Error while adding row to Warehouse 1: Preparation Form {e}")
             self.conn.rollback()  # Rollback the transaction if there's an error
         finally:
             self.close_connection()

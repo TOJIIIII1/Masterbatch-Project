@@ -15,7 +15,7 @@ class Spreadsheet4:
         """Connect to the PostgreSQL database."""
         try:
             self.conn = psycopg2.connect(
-                host="192.168.1.224",  # Replace with your database host
+                host="localhost",  # Replace with your database host
                 port=5432,  # Replace with your database port
                 dbname="Inventory",  # Replace with your database name
                 user="postgres",  # Replace with your username
@@ -177,7 +177,7 @@ class Spreadsheet4:
         frame.grid_columnconfigure(0, weight=1)
 
         # **Move Header to the Top**
-        tk.Label(frame, text="SOH SUMMARY", font=("Arial", 25, "bold")).grid(
+        tk.Label(frame, text="Warehouse 1: SOH SUMMARY", font=("Arial", 25, "bold")).grid(
             row=0, column=0, padx=10, pady=(10, 5), columnspan=5
         )
 

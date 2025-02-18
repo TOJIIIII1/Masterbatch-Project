@@ -17,7 +17,7 @@ class Wh1TransferForm:
             if self.conn is None or self.conn.closed != 0:
                 # Reconnect to the database if the connection is closed
                 self.conn = psycopg2.connect(
-                    host="192.168.1.224",
+                    host="localhost",
                     port=5432,
                     dbname="Inventory",
                     user="postgres",
@@ -294,7 +294,7 @@ class Wh1TransferForm:
                 self.cursor.execute(insert_wh2_query,
                                     (reference_no, date, material_code_id, quantity, "From Warehouse 1", status))
                 self.conn.commit()
-                messagebox.showinfo("Success", "Row added to Warehouse 1 and Warehouse 2: Receiving Report.")
+                messagebox.showinfo("Success", "Row added to Warehouse 1: Transfer Form and Warehouse 2: Receiving Report.")
 
             elif area_to == "4":
                 insert_wh4_query = """
@@ -304,7 +304,7 @@ class Wh1TransferForm:
                 self.cursor.execute(insert_wh4_query,
                                     (reference_no, date, material_code_id, quantity, "From Warehouse 1", status))
                 self.conn.commit()
-                messagebox.showinfo("Success", "Row added to Warehouse 1 and Warehouse 4: Receiving Report.")
+                messagebox.showinfo("Success", "Row added to Warehouse 1: Transfer Form and Warehouse 4: Receiving Report.")
 
             elif area_to == "1":
                 insert_wh1_query = """
@@ -314,7 +314,7 @@ class Wh1TransferForm:
                 self.cursor.execute(insert_wh1_query,
                                     (reference_no, date, material_code_id, quantity, "From Warehouse 1", new_status))
                 self.conn.commit()
-                messagebox.showinfo("Success", "Row added to Warehouse 1 and Warehouse 1: Receiving Report.")
+                messagebox.showinfo("Success", "Row added to Warehouse 1: Transfer Form and Warehouse 1: Receiving Report.")
 
             else:
                 messagebox.showinfo("Success", "Row added Successfully.")

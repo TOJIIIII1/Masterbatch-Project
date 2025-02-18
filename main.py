@@ -210,7 +210,6 @@ class MainApp:
         self.clear_all_pages(clear_ui_only=True)  # ✅ Call `clear_all_pages`
         self.root.after(86400000, self.run_clear_task)  # Schedule next run in 24 hours
 
-
     def run(self):
         # Run the app
         self.root.mainloop()

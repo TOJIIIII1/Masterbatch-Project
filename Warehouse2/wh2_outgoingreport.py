@@ -18,7 +18,7 @@ class Wh2OutgoingReport:
             if self.conn is None or self.conn.closed != 0:
                 # Reconnect to the database if the connection is closed
                 self.conn = psycopg2.connect(
-                    host="192.168.1.224",
+                    host="localhost",
                     port=5432,
                     dbname="Inventory",
                     user="postgres",
@@ -221,8 +221,6 @@ class Wh2OutgoingReport:
         entry_frame.grid_columnconfigure(len(column_names_wh2_outgoing_report) - 1, weight=1)
 
     # Other methods (add_row_wh2_outgoing_report, update_row_wh2_outgoing_report, etc.) remain the same.
-
-
     def add_row_wh2_outgoing_report(self, table):
         try:
             self.connect_db()  # Ensure the connection is open
@@ -264,7 +262,7 @@ class Wh2OutgoingReport:
             self.cursor.execute(query, values)
             self.conn.commit()
 
-            messagebox.showinfo("Success", "Row added successfully to Table 1.")
+            messagebox.showinfo("Success", "Row added successfully to Warehouse 2: Outgoing Report.")
 
             # After adding the row, refresh the Treeview to show the updated data
             data_wh2_outgoing_report = self.fetch_data_from_wh2_outgoing_report()
@@ -272,8 +270,9 @@ class Wh2OutgoingReport:
                                  ["Reference No.", "Date Outgoing", "Material Code", "Quantity", "Area Location"])
 
         except Exception as e:
-            messagebox.showerror("Error", f"Error while adding row to Table 1: {e}")
-            print("Error", f"Error while adding row to Table 1: {e}")
+            messagebox.showerror("Error", f"Error while adding row to Warehouse 2: Outgoing Report"
+                                          f" {e}")
+            print("Error", f"Error while adding row to Warehouse 2: Outgoing Report {e}")
             self.conn.rollback()  # Rollback the transaction if there's an error
         finally:
             self.close_connection()
