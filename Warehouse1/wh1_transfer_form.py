@@ -154,8 +154,8 @@ class Wh1TransferForm:
                 date_entry.grid(row=1, column=i, padx=10, pady=5)
                 date_entry.bind("<KeyRelease>", format_date_input)
                 wh1_transfer_form_entries.append(date_entry)
-            elif label_text == "Material Code":
 
+            elif label_text == "Material Code":
                 def to_uppercase(*args):
                     combobox_var.set(combobox_var.get().upper())  # Convert input to uppercase
 
@@ -167,12 +167,25 @@ class Wh1TransferForm:
                 combobox_var.trace_add("write", to_uppercase)
 
                 wh1_transfer_form_entries.append(combobox)
+
+            elif label_text == "Area To":
+                # Convert Area To into a Drop-Down List
+                area_combobox = ttk.Combobox(
+                    entry_frame,
+                    values=["1", "2", "4"],  # Only valid area numbers
+                    width=15
+                )
+                area_combobox.grid(row=1, column=i, padx=10, pady=5)
+                wh1_transfer_form_entries.append(area_combobox)
+
             elif label_text == "Status":
                 status_combobox = ttk.Combobox(
-                    entry_frame, values=["Good", "held: rejected", "held: under evaluation", "held: contaminated"], width=15
+                    entry_frame, values=["Good", "held: rejected", "held: under evaluation", "held: contaminated"],
+                    width=15
                 )
                 status_combobox.grid(row=1, column=i, padx=10, pady=5)
                 wh1_transfer_form_entries.append(status_combobox)
+
             else:
                 entry = ttk.Entry(entry_frame, width=15)
                 entry.grid(row=1, column=i, padx=10, pady=5)
@@ -250,7 +263,7 @@ class Wh1TransferForm:
             quantity = self.wh1_transfer_form_entries[3].get()
             area_to = self.wh1_transfer_form_entries[4].get()
             status = self.wh1_transfer_form_entries[5].get()
-            new_status = self.additional_combobox.get()  # Get status
+            new_status = self.additional_combobox.get()  # Get new status
 
             # Validate inputs
             if not reference_no or not date or not material_code or not quantity or not area_to or not status or not new_status:
@@ -264,9 +277,38 @@ class Wh1TransferForm:
                 messagebox.showwarning("Invalid Input", "Quantity must be a number.")
                 return
 
-            # Check available stock for the material_code
-            check_quantity_query = "SELECT total_quantity FROM wh1_material_code_totals WHERE material_code_name = %s"
-            self.cursor.execute(check_quantity_query, (material_code,))
+                # ✅ **Validate Area To**
+            allowed_areas = {"1", "2", "4"}
+            if area_to not in allowed_areas:
+                messagebox.showwarning("Invalid Area", "Transfers are only allowed to Warehouse 1, 2, or 4.")
+                return
+
+            # Step 1: Validate Material Code and Status
+            get_material_codes_with_status = """
+                SELECT material_code_name FROM wh1_material_code_totals WHERE status = %s
+            """
+            self.cursor.execute(get_material_codes_with_status, (status,))
+            matching_material_codes = self.cursor.fetchall()
+
+            if not matching_material_codes:
+                messagebox.showerror("Error", f"No material codes found with status '{status}' in the database.")
+                return
+
+            # Convert query results into a list
+            matching_material_codes_list = [code[0] for code in matching_material_codes]
+            print(f"Material Codes with Status '{status}': {matching_material_codes_list}")  # Debugging
+
+            # Check if user-selected material code exists in the retrieved list
+            if material_code not in matching_material_codes_list:
+                messagebox.showerror("Material Code Mismatch",
+                                     f"Material code '{material_code}' does not match any material code with status '{status}' in the database.")
+                return
+
+            # Step 2: Retrieve the total quantity of the material code with matching status
+            get_total_quantity = """
+                SELECT total_quantity FROM wh1_material_code_totals WHERE material_code_name = %s AND status = %s
+            """
+            self.cursor.execute(get_total_quantity, (material_code, status))
             total_quantity_result = self.cursor.fetchone()
 
             if total_quantity_result is None:
@@ -275,13 +317,13 @@ class Wh1TransferForm:
 
             total_quantity = total_quantity_result[0]  # Extract the total_quantity value
 
-            # Check if the requested quantity exceeds available stock
+            # Step 3: Check if requested quantity exceeds available stock
             if quantity > total_quantity:
                 messagebox.showwarning("Exceed Quantity",
                                        f"Insufficient stock! Available: {total_quantity}, Requested: {quantity}")
                 return
 
-            # Get material_code_id
+            # Step 4: Get material_code_id
             get_material_id = "SELECT mid FROM material_codes WHERE material_code = %s"
             self.cursor.execute(get_material_id, (material_code,))
             material_code_id = self.cursor.fetchone()
@@ -293,7 +335,7 @@ class Wh1TransferForm:
 
             material_code_id = material_code_id[0]  # Extract the ID
 
-            # Insert into the wh1_transfer_form
+            # Step 5: Insert into the wh1_transfer_form
             query = """
                 INSERT INTO wh1_transfer_form (reference_no, date, material_code, quantity, area_to, status) 
                 VALUES (%s, %s, %s, %s, %s, %s)
@@ -302,7 +344,7 @@ class Wh1TransferForm:
             self.cursor.execute(query, values)
             self.conn.commit()
 
-            # Check if area_to is 2 or 4 and insert accordingly
+            # Step 6: Insert into the corresponding receiving report based on area_to
             if area_to == "2":
                 insert_wh2_query = """
                     INSERT INTO wh2_receiving_report (reference_no, date_received, material_code, quantity, area_location, status) 

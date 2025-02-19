@@ -21,7 +21,7 @@ class Notes:
         try:
             if self.conn is None or self.conn.closed != 0:
                 self.conn = psycopg2.connect(
-                    host="192.168.1.224",
+                    host="localhost",
                     port=5431,
                     dbname="Inventory",
                     user="postgres",

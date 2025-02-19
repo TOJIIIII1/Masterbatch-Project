@@ -18,7 +18,7 @@ class Wh1PreparationForm:
             if self.conn is None or self.conn.closed != 0:
                 # Reconnect to the database if the connection is closed
                 self.conn = psycopg2.connect(
-                    host="192.168.1.224",
+                    host="localhost",
                     port=5431,
                     dbname="Inventory",
                     user="postgres",
