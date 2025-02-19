@@ -8,7 +8,7 @@ def get_raw_material_id(rm_code):
     query = f"SELECT mid FROM wh4_material_codes WHERE material_code = '{rm_code}'"
     # Assuming you have a PostgreSQL connection (replace with your connection details)
     connection = psycopg2.connect(
-        dbname="Inventory", user="postgres", password="newpassword", host="localhost", port="5432"
+        dbname="Inventory", user="postgres", password="newpassword", host="192.168.1.224", port="5432"
     )
     cursor = connection.cursor()
     cursor.execute(query)
@@ -21,7 +21,7 @@ def get_raw_material_id(rm_code):
 def create_record(reference_no, date_received, material_code_id, quantity, area_location, id, deleted, status):
 
     connection = psycopg2.connect(
-        dbname="Inventory", user="postgres", password="newpassword", host="localhost", port="5432"
+        dbname="Inventory", user="postgres", password="newpassword", host="192.168.1.224", port="5432"
     )
 
     # Create a cursor object to interact with the database

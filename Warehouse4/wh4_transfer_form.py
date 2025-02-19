@@ -16,7 +16,7 @@ class Wh4TransferForm:
                 # Reconnect to the database if the connection is closed
                 self.conn = psycopg2.connect(
                     host="localhost",
-                    port=5432,
+                    port=5431,
                     dbname="Inventory",
                     user="postgres",
                     password="newpassword"
@@ -248,18 +248,35 @@ class Wh4TransferForm:
             quantity = self.wh4_transfer_form_entries[3].get()
             area_to = self.wh4_transfer_form_entries[4].get()
             status = self.wh4_transfer_form_entries[5].get()
-            new_status = self.additional_combobox.get() # Get status
+            new_status = self.additional_combobox.get()  # Get status
 
             # Validate inputs
-            if not reference_no or not date or not material_code or not quantity or not area_to or not status:
+            if not reference_no or not date or not material_code or not quantity or not area_to or not status or not new_status:
                 messagebox.showwarning("Missing Fields", "Please fill in all fields before adding.")
                 return
 
-            # Validate quantity as an integer
+            # Validate quantity as a number
             try:
                 quantity = float(quantity)
             except ValueError:
                 messagebox.showwarning("Invalid Input", "Quantity must be a number.")
+                return
+
+            # Check available stock for the material_code
+            check_quantity_query = "SELECT total_quantity FROM wh4_material_code_totals WHERE material_code_name = %s"
+            self.cursor.execute(check_quantity_query, (material_code,))
+            total_quantity_result = self.cursor.fetchone()
+
+            if total_quantity_result is None:
+                messagebox.showerror("Error", "No inventory record found for the selected material code.")
+                return
+
+            total_quantity = total_quantity_result[0]  # Extract the total_quantity value
+
+            # Check if the requested quantity exceeds available stock
+            if quantity > total_quantity:
+                messagebox.showwarning("Exceed Quantity",
+                                       f"Insufficient stock! Available: {total_quantity}, Requested: {quantity}")
                 return
 
             # Get material_code_id
@@ -274,7 +291,7 @@ class Wh4TransferForm:
 
             material_code_id = material_code_id[0]  # Extract the ID
 
-            # Insert into the wh1_transfer_form
+            # Insert into the wh4_transfer_form
             query = """
                 INSERT INTO wh4_transfer_form (reference_no, date, material_code, quantity, area_to, status) 
                 VALUES (%s, %s, %s, %s, %s, %s)
@@ -283,41 +300,41 @@ class Wh4TransferForm:
             self.cursor.execute(query, values)
             self.conn.commit()
 
-            # Check if area_to is 2 or 4 and insert accordingly
+            # Check if area_to is 1, 2, or 4 and insert accordingly
             if area_to == "1":
-                # Insert into w1_receiving_report
                 insert_wh1_query = """
                     INSERT INTO wh1_receiving_report (reference_no, date_received, material_code, quantity, area_location, status) 
                     VALUES (%s, %s, %s, %s, %s, %s)
                 """
-                self.cursor.execute(insert_wh1_query, (reference_no, date, material_code_id, quantity, "From Warehouse 4", status))
+                self.cursor.execute(insert_wh1_query,
+                                    (reference_no, date, material_code_id, quantity, "From Warehouse 4", status))
                 self.conn.commit()
-                messagebox.showinfo("Success", "Row added to Warehouse 4: Transfer Form and Warehouse 1: Receiving Report.")
+                messagebox.showinfo("Success", "Row added to Warehouse 4 and Warehouse 1: Receiving Report.")
 
             elif area_to == "2":
-                # Insert into w2_receiving_report
                 insert_wh2_query = """
                     INSERT INTO wh2_receiving_report (reference_no, date_received, material_code, quantity, area_location, status) 
                     VALUES (%s, %s, %s, %s, %s, %s)
                 """
-                self.cursor.execute(insert_wh2_query, (reference_no, date, material_code_id, quantity, "From Warehouse 4", status))
+                self.cursor.execute(insert_wh2_query,
+                                    (reference_no, date, material_code_id, quantity, "From Warehouse 4", status))
                 self.conn.commit()
-                messagebox.showinfo("Success", "Row added to Warehouse 4: Transfer Form and Warehouse 2: Receiving Report.")
+                messagebox.showinfo("Success", "Row added to Warehouse 4 and Warehouse 2: Receiving Report.")
 
             elif area_to == "4":
-                # Insert into w4_receiving_report
                 insert_wh4_query = """
                     INSERT INTO wh4_receiving_report (reference_no, date_received, material_code, quantity, area_location, status) 
                     VALUES (%s, %s, %s, %s, %s, %s)
                 """
-                self.cursor.execute(insert_wh4_query, (reference_no, date, material_code_id, quantity, "From Warehouse 4", new_status))
+                self.cursor.execute(insert_wh4_query,
+                                    (reference_no, date, material_code_id, quantity, "From Warehouse 4", new_status))
                 self.conn.commit()
-                messagebox.showinfo("Success", "Row added to Warehouse 4: Transfer Form and Warehouse 4: Receiving Report.")
+                messagebox.showinfo("Success", "Row added to Warehouse 4 and Warehouse 4: Receiving Report.")
 
             else:
                 messagebox.showinfo("Success", "Row added Successfully.")
 
-            # **Refresh the Treeview for wh1_transfer_form**
+            # **Refresh the Treeview for wh4_transfer_form**
             data_wh4_transfer_form = self.fetch_data_from_wh4_transfer_form()
             self.update_treeview(table, data_wh4_transfer_form,
                                  ["Reference No.", "Date", "Material Code", "Quantity", "Area To", "Status"])

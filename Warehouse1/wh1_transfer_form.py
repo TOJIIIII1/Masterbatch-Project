@@ -18,7 +18,7 @@ class Wh1TransferForm:
                 # Reconnect to the database if the connection is closed
                 self.conn = psycopg2.connect(
                     host="localhost",
-                    port=5432,
+                    port=5431,
                     dbname="Inventory",
                     user="postgres",
                     password="newpassword"
@@ -264,6 +264,23 @@ class Wh1TransferForm:
                 messagebox.showwarning("Invalid Input", "Quantity must be a number.")
                 return
 
+            # Check available stock for the material_code
+            check_quantity_query = "SELECT total_quantity FROM wh1_material_code_totals WHERE material_code_name = %s"
+            self.cursor.execute(check_quantity_query, (material_code,))
+            total_quantity_result = self.cursor.fetchone()
+
+            if total_quantity_result is None:
+                messagebox.showerror("Error", "No inventory record found for the selected material code.")
+                return
+
+            total_quantity = total_quantity_result[0]  # Extract the total_quantity value
+
+            # Check if the requested quantity exceeds available stock
+            if quantity > total_quantity:
+                messagebox.showwarning("Exceed Quantity",
+                                       f"Insufficient stock! Available: {total_quantity}, Requested: {quantity}")
+                return
+
             # Get material_code_id
             get_material_id = "SELECT mid FROM material_codes WHERE material_code = %s"
             self.cursor.execute(get_material_id, (material_code,))
@@ -294,7 +311,7 @@ class Wh1TransferForm:
                 self.cursor.execute(insert_wh2_query,
                                     (reference_no, date, material_code_id, quantity, "From Warehouse 1", status))
                 self.conn.commit()
-                messagebox.showinfo("Success", "Row added to Warehouse 1: Transfer Form and Warehouse 2: Receiving Report.")
+                messagebox.showinfo("Success", "Row added to Warehouse 1 and Warehouse 2: Receiving Report.")
 
             elif area_to == "4":
                 insert_wh4_query = """
@@ -304,7 +321,7 @@ class Wh1TransferForm:
                 self.cursor.execute(insert_wh4_query,
                                     (reference_no, date, material_code_id, quantity, "From Warehouse 1", status))
                 self.conn.commit()
-                messagebox.showinfo("Success", "Row added to Warehouse 1: Transfer Form and Warehouse 4: Receiving Report.")
+                messagebox.showinfo("Success", "Row added to Warehouse 1 and Warehouse 4: Receiving Report.")
 
             elif area_to == "1":
                 insert_wh1_query = """
@@ -314,7 +331,7 @@ class Wh1TransferForm:
                 self.cursor.execute(insert_wh1_query,
                                     (reference_no, date, material_code_id, quantity, "From Warehouse 1", new_status))
                 self.conn.commit()
-                messagebox.showinfo("Success", "Row added to Warehouse 1: Transfer Form and Warehouse 1: Receiving Report.")
+                messagebox.showinfo("Success", "Row added to Warehouse 1 and Warehouse 1: Receiving Report.")
 
             else:
                 messagebox.showinfo("Success", "Row added Successfully.")

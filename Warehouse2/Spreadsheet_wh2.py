@@ -16,7 +16,7 @@ class Spreadsheet2:
         try:
             self.conn = psycopg2.connect(
                 host="localhost",  # Replace with your database host
-                port=5432,  # Replace with your database port
+                port=5431,  # Replace with your database port
                 dbname="Inventory",  # Replace with your database name
                 user="postgres",  # Replace with your username
                 password="newpassword"  # Replace with your password
@@ -177,7 +177,7 @@ class Spreadsheet2:
         frame.grid_columnconfigure(0, weight=1)
 
         # **Move Header to the Top**
-        tk.Label(frame, text="Warehouse 1: SOH SUMMARY", font=("Arial", 25, "bold")).grid(
+        tk.Label(frame, text="Warehouse 2: SOH SUMMARY", font=("Arial", 25, "bold")).grid(
             row=0, column=0, padx=10, pady=(10, 5), columnspan=5
         )
 

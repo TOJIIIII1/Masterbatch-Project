@@ -19,7 +19,7 @@ class Wh1ReceivingReport:
                 # Reconnect to the database if the connection is closed
                 self.conn = psycopg2.connect(
                     host="localhost",
-                    port=5432,
+                    port=5431,
                     dbname="Inventory",
                     user="postgres",
                     password="newpassword"
@@ -260,7 +260,7 @@ class Wh1ReceivingReport:
             self.cursor.execute(query, values)
             self.conn.commit()
 
-            messagebox.showinfo("Success", "Row added successfully to Warehouse 1: Receiving Report.")
+            messagebox.showinfo("Success", "Row added successfully to Table 1.")
 
             # After adding the row, refresh the Treeview to show the updated data
             data_wh1_receiving_report = self.fetch_data_from_wh1_receiving_report()
@@ -268,7 +268,7 @@ class Wh1ReceivingReport:
                                  ["Reference No.", "Date Received", "Material Code", "Quantity", "Area Location"])
 
         except Exception as e:
-            messagebox.showerror("Error", f"Error while adding row to Warehouse 1: Receiving Report {e}")
+            messagebox.showerror("Error", f"Error while adding row to Table 1: {e}")
             self.conn.rollback()  # Rollback the transaction if there's an error
         finally:
             self.close_connection()

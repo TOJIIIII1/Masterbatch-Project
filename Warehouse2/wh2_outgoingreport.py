@@ -19,7 +19,7 @@ class Wh2OutgoingReport:
                 # Reconnect to the database if the connection is closed
                 self.conn = psycopg2.connect(
                     host="localhost",
-                    port=5432,
+                    port=5431,
                     dbname="Inventory",
                     user="postgres",
                     password="newpassword"
@@ -237,11 +237,11 @@ class Wh2OutgoingReport:
                 messagebox.showwarning("Missing Fields", "Please fill in all fields before adding.")
                 return
 
-            # Ensure quantity is a valid integer
+            # Ensure quantity is a valid number
             try:
-                quantity = float(quantity)  # Convert to integer
+                quantity = float(quantity)  # Convert to float for quantity check
             except ValueError:
-                messagebox.showwarning("Invalid Input", "Quantity must be a number.")
+                messagebox.showwarning("Invalid Input", "Quantity must be a valid number.")
                 return
 
             # Get material_code_id from the material_codes table
@@ -255,24 +255,39 @@ class Wh2OutgoingReport:
 
             material_code_id = material_code_id[0]  # Extract the ID from the tuple
 
-            # Insert a new row into PostgreSQL (wh2_outgoing_report table)
+            # Check the available total quantity in wh1_material_code_totals
+            check_quantity_query = "SELECT total_quantity FROM wh2_material_code_totals WHERE material_code_name = %s"
+            self.cursor.execute(check_quantity_query, (material_code,))
+            total_quantity_result = self.cursor.fetchone()
+
+            if total_quantity_result is None:
+                messagebox.showerror("Error", "No inventory record found for the selected material code.")
+                return
+
+            total_quantity = total_quantity_result[0]  # Extract the total_quantity value
+
+            # Check if the requested quantity exceeds available stock
+            if quantity > total_quantity:
+                messagebox.showwarning("Exceed Quantity",
+                                       f"Insufficient stock! Available: {total_quantity}, Requested: {quantity}")
+                return
+
+            # Insert a new row into PostgreSQL (wh1_outgoing_report table)
             query = """INSERT INTO wh2_outgoing_report (reference_no, date_outgoing, material_code, quantity, area_location) 
                        VALUES (%s, %s, %s, %s, %s)"""
             values = (reference_no, date_outgoing, material_code_id, quantity, f"Warehouse {area_location}")
             self.cursor.execute(query, values)
             self.conn.commit()
 
-            messagebox.showinfo("Success", "Row added successfully to Warehouse 2: Outgoing Report.")
+            messagebox.showinfo("Success", "Row added successfully to Table 1.")
 
             # After adding the row, refresh the Treeview to show the updated data
-            data_wh2_outgoing_report = self.fetch_data_from_wh2_outgoing_report()
-            self.update_treeview(table, data_wh2_outgoing_report,
+            data_wh1_outgoing_report = self.fetch_data_from_wh2_outgoing_report()
+            self.update_treeview(table, data_wh1_outgoing_report,
                                  ["Reference No.", "Date Outgoing", "Material Code", "Quantity", "Area Location"])
 
         except Exception as e:
-            messagebox.showerror("Error", f"Error while adding row to Warehouse 2: Outgoing Report"
-                                          f" {e}")
-            print("Error", f"Error while adding row to Warehouse 2: Outgoing Report {e}")
+            messagebox.showerror("Error", f"Error while adding row to Table 1: {e}")
             self.conn.rollback()  # Rollback the transaction if there's an error
         finally:
             self.close_connection()

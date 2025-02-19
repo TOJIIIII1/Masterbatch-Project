@@ -14,7 +14,7 @@ class AddMaterialCode:
         try:
             self.conn = psycopg2.connect(
                 host="localhost",
-                port=5432,
+                port=5431,
                 dbname="Inventory",
                 user="postgres",
                 password="newpassword"
@@ -103,9 +103,6 @@ class AddMaterialCode:
         if not material_code:
             messagebox.showerror("Error", "Material Code cannot be empty!")
             return
-        if not material_code.isalnum():
-            messagebox.showerror("Error", "Material Code must not contain symbols!")
-            return
 
         try:
             # Insert data into the database without 'area_location'
@@ -137,7 +134,6 @@ class AddMaterialCode:
                 self.tree.insert("", tk.END, values=row)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to fetch data: {e}")
-
 
     def close_db_connection(self):
         """Close the database connection."""
