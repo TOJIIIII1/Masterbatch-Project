@@ -18,11 +18,11 @@ class Wh1ReceivingReport:
             if self.conn is None or self.conn.closed != 0:
                 # Reconnect to the database if the connection is closed
                 self.conn = psycopg2.connect(
-                    host="192.168.1.13",
-                    port=5432,
+                    host="localhost",
+                    port=5431,
                     dbname="Inventory",
                     user="postgres",
-                    password="mbpi"
+                    password="newpassword"
                 )
                 self.cursor = self.conn.cursor()
                 print("Database connection established.")

@@ -13,11 +13,11 @@ class Wh4AddMaterialCode:
         """Connect to the PostgreSQL database."""
         try:
             self.conn = psycopg2.connect(
-                host="192.168.1.13",
-                port=5432,
+                host="localhost",
+                port=5431,
                 dbname="Inventory",
                 user="postgres",
-                password="mbpi"
+                password="newpassword"
             )
             self.cursor = self.conn.cursor()
         except Exception as e:

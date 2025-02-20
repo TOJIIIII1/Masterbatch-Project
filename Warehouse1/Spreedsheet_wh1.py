@@ -15,11 +15,11 @@ class Spreadsheet1:
         """Connect to the PostgreSQL database."""
         try:
             self.conn = psycopg2.connect(
-                host="192.168.1.13",  # Replace with your database host
-                port=5432,  # Replace with your database port
+                host="localhost",  # Replace with your database host
+                port=5431,  # Replace with your database port
                 dbname="Inventory",  # Replace with your database name
                 user="postgres",  # Replace with your username
-                password="mbpi"  # Replace with your password
+                password="newpassword"  # Replace with your password
             )
             self.cursor = self.conn.cursor()
             self.load_data_from_db()  # Load data after connecting
