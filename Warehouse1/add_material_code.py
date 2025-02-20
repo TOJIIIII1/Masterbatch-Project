@@ -13,11 +13,11 @@ class AddMaterialCode:
         """Connect to the PostgreSQL database."""
         try:
             self.conn = psycopg2.connect(
-                host="localhost",
+                host="192.168.1.13",
                 port=5432,
                 dbname="Inventory",
                 user="postgres",
-                password="newpassword"
+                password="mbpi"
             )
             self.cursor = self.conn.cursor()
         except Exception as e:
@@ -30,7 +30,7 @@ class AddMaterialCode:
             widget.destroy()
 
         # Header Label
-        tk.Label(parent_frame, text="Material Code Management", font=("Arial", 18, "bold"), pady=10).pack()
+        tk.Label(parent_frame, text="Warehouse 1: Material Code Management", font=("Arial", 18, "bold"), pady=10).pack()
 
         # Search Bar Frame
         search_frame = tk.Frame(parent_frame)
@@ -42,7 +42,7 @@ class AddMaterialCode:
         self.search_entry.bind("<KeyRelease>", self.filter_data)  # Dynamic search on key release
 
         # Treeview Frame (Balanced Width)
-        tree_frame = tk.Frame(parent_frame, width=400)  # Adjust width here
+        tree_frame = tk.Frame(parent_frame, width=600)  # Adjust width here
         tree_frame.pack(pady=10)
 
         self.tree = ttk.Treeview(
@@ -103,24 +103,30 @@ class AddMaterialCode:
         if not material_code:
             messagebox.showerror("Error", "Material Code cannot be empty!")
             return
-        if not material_code.isalnum():
-            messagebox.showerror("Error", "Material Code must not contain symbols!")
-            return
 
         try:
-            # Insert data into the database without 'area_location'
-            self.cursor.execute(
+            # Insert data into the different material code tables
+            queries = [
                 "INSERT INTO material_codes (material_code, qty_per_packing) VALUES (%s, %s)",
-                (material_code, 0)
-            )
-            self.conn.commit()
+                "INSERT INTO wh2_material_codes (material_code, qty_per_packing) VALUES (%s, %s)",
+                "INSERT INTO wh4_material_codes (material_code, qty_per_packing) VALUES (%s, %s)"
+            ]
+
+            for query in queries:
+                self.cursor.execute(query, (material_code, 0))  # Execute each query separately
+
+            self.conn.commit()  # Commit all inserts
 
             # Clear input fields
             self.material_code_entry.delete(0, tk.END)
 
             # Reload data in the Treeview
             self.load_data()
+
+            messagebox.showinfo("Success", "Material Code added successfully.")
+
         except Exception as e:
+            self.conn.rollback()  # Ensure rollback if there's an error
             messagebox.showerror("Error", f"Failed to add material code: {e}")
 
     def load_data(self):
@@ -137,7 +143,6 @@ class AddMaterialCode:
                 self.tree.insert("", tk.END, values=row)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to fetch data: {e}")
-
 
     def close_db_connection(self):
         """Close the database connection."""

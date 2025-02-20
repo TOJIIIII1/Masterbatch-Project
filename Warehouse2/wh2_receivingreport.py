@@ -19,11 +19,11 @@ class Wh2ReceivingReport:
             if self.conn is None or self.conn.closed != 0:
                 # Reconnect to the database if the connection is closed
                 self.conn = psycopg2.connect(
-                    host="localhost",
+                    host="192.168.1.13",
                     port=5432,
                     dbname="Inventory",
                     user="postgres",
-                    password="newpassword"
+                    password="mbpi"
                 )
                 self.cursor = self.conn.cursor()
                 print("Database connection established.")
@@ -148,6 +148,8 @@ class Wh2ReceivingReport:
         wh2_material_codes = self.fetch_wh2_material_codes()
 
         for i, label_text in enumerate(column_names_wh2_receiving_report):
+            if label_text == "Area Location":
+                continue
             col_label = ttk.Label(entry_frame, text=label_text, font=("Arial", 12))
             col_label.grid(row=0, column=i, padx=10, pady=5)
 
@@ -228,10 +230,9 @@ class Wh2ReceivingReport:
             date_received = self.wh2_receiving_report_entries[1].get()
             material_code = self.wh2_receiving_report_entries[2].get()
             quantity = self.wh2_receiving_report_entries[3].get()
-            area_location = self.wh2_receiving_report_entries[4].get()
 
             # Ensure inputs are not empty
-            if not reference_no or not date_received or not material_code or not quantity or not area_location:
+            if not reference_no or not date_received or not material_code or not quantity:
                 messagebox.showwarning("Missing Fields", "Please fill in all fields before adding.")
                 return
 
@@ -256,7 +257,7 @@ class Wh2ReceivingReport:
             # Insert a new row into PostgreSQL (wh2_receiving_report table)
             query = """INSERT INTO wh2_receiving_report (reference_no, date_received, material_code, quantity, area_location) 
                        VALUES (%s, %s, %s, %s, %s)"""
-            values = (reference_no, date_received, material_code_id, quantity, f"Warehouse {area_location}")
+            values = (reference_no, date_received, material_code_id, quantity, "Warehouse 2")
             self.cursor.execute(query, values)
             self.conn.commit()
 
@@ -283,12 +284,12 @@ class Wh2ReceivingReport:
                 messagebox.showwarning("No Selection", "Please select a row to update.")
                 return
 
-            # Extract reference_no from selected row (assuming it's the first column)
+            # Extract values from selected row (assuming first column is reference_no)
             selected_values = table.item(selected_item, "values")
-            reference_no = selected_values[0].strip()  # Ensure no leading/trailing spaces
+            old_reference_no = selected_values[0].strip()  # Get the original reference_no
 
             # Fetch ID from the database using reference_no
-            self.cursor.execute("SELECT id FROM wh2_receiving_report WHERE reference_no = %s", (reference_no,))
+            self.cursor.execute("SELECT id FROM wh2_receiving_report WHERE reference_no = %s", (old_reference_no,))
             result = self.cursor.fetchone()
 
             if not result:
@@ -298,10 +299,10 @@ class Wh2ReceivingReport:
             row_id = result[0]  # Extract the ID
 
             # Retrieve values from entry fields (only update non-empty fields)
+            new_reference_no = self.wh2_receiving_report_entries[0].get().strip()  # ✅ Add Reference No. field
             date_received = self.wh2_receiving_report_entries[1].get().strip()
             material_code = self.wh2_receiving_report_entries[2].get().strip()
             quantity = self.wh2_receiving_report_entries[3].get().strip()
-            area_location = self.wh2_receiving_report_entries[4].get().strip()
 
             # Get material_code_id from the material_codes table (if material_code is provided)
             material_code_id = None
@@ -315,6 +316,9 @@ class Wh2ReceivingReport:
             query = "UPDATE wh2_receiving_report SET "
             values = []
 
+            if new_reference_no:
+                query += "reference_no = %s, "  # ✅ Allow updating Reference No.
+                values.append(new_reference_no)
             if date_received:
                 query += "date_received = %s, "
                 values.append(date_received)
@@ -324,9 +328,6 @@ class Wh2ReceivingReport:
             if quantity:
                 query += "quantity = %s, "
                 values.append(float(quantity))  # Ensure it's stored as a float
-            if area_location:
-                query += "area_location = %s, "
-                values.append(area_location)
 
             # Ensure at least one field is being updated
             if not values:
@@ -348,14 +349,14 @@ class Wh2ReceivingReport:
 
             # ✅ Update only the modified row in Treeview to retain order
             updated_values = list(selected_values)  # Convert tuple to list
+            if new_reference_no:
+                updated_values[0] = new_reference_no  # ✅ Update reference_no in the table
             if date_received:
                 updated_values[1] = date_received
             if material_code:
                 updated_values[2] = material_code
             if quantity:
                 updated_values[3] = quantity
-            if area_location:
-                updated_values[4] = area_location
 
             # ✅ Update the selected row instead of clearing the whole table
             table.item(selected_item, values=updated_values)

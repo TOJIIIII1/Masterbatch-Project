@@ -18,11 +18,11 @@ class Wh4PreparationForm:
             if self.conn is None or self.conn.closed != 0:
                 # Reconnect to the database if the connection is closed
                 self.conn = psycopg2.connect(
-                    host="localhost",
+                    host="192.168.1.13",
                     port=5432,
                     dbname="Inventory",
                     user="postgres",
-                    password="newpassword"
+                    password="mbpi"
                 )
                 self.cursor = self.conn.cursor()
                 print("Database connection established.")
@@ -53,8 +53,9 @@ class Wh4PreparationForm:
                        TO_CHAR(wh4_preparation_form.date, 'MM/DD/YYYY') AS date, 
                        material_codes.material_code, 
                        wh4_preparation_form.quantity_prepared, 
-                       wh4_preparation_form.quantity_return,  -- Fixed missing comma
-                       wh4_preparation_form.area_location    -- Fixed missing comma
+                       wh4_preparation_form.quantity_return,  
+                       wh4_preparation_form.area_location,
+                       wh4_preparation_form.status
                 FROM wh4_preparation_form
                 INNER JOIN material_codes
                     ON wh4_preparation_form.material_code = material_codes.mid
@@ -118,7 +119,7 @@ class Wh4PreparationForm:
         scrollbar.pack(side="right", fill="y")
 
         column_names_wh4_preparation_form = [
-            "Reference No.", "Date Received", "Material Code", "Quantity Prepared", "Quantity Return", "Area Location"
+            "Reference No.", "Date Received", "Material Code", "Quantity Prepared", "Quantity Return", "Area Location", "Status"
         ]
         wh4_preparation_form = ttk.Treeview(
             table_frame,
@@ -150,6 +151,9 @@ class Wh4PreparationForm:
         material_codes = self.fetch_material_codes()
 
         for i, label_text in enumerate(column_names_wh4_preparation_form):
+            if label_text == "Area Location":
+                wh4_preparation_form_entries.append("Warehouse 2")  # Set a fixed value
+                continue
             col_label = ttk.Label(entry_frame, text=label_text, font=("Arial", 12))
             col_label.grid(row=0, column=i, padx=10, pady=5)
 
@@ -171,6 +175,12 @@ class Wh4PreparationForm:
                 combobox_var.trace_add("write", to_uppercase)
 
                 wh4_preparation_form_entries.append(combobox)
+            elif label_text == "Status":
+                status_combobox = ttk.Combobox(
+                    entry_frame, values=["Good", "held: rejected", "held: under evaluation", "held: contaminated"], width=15
+                )
+                status_combobox.grid(row=1, column=i, padx=10, pady=5)
+                wh4_preparation_form_entries.append(status_combobox)
             else:
                 entry = ttk.Entry(entry_frame, width=15)
                 entry.grid(row=1, column=i, padx=10, pady=5)
@@ -231,23 +241,23 @@ class Wh4PreparationForm:
             material_code = self.wh4_preparation_form_entries[2].get()
             quantity_prepared = self.wh4_preparation_form_entries[3].get()
             quantity_return = self.wh4_preparation_form_entries[4].get()
-            area_location = self.wh4_preparation_form_entries[5].get()
+
+            status = self.wh4_preparation_form_entries[6].get()
 
             # Ensure inputs are not empty
-            if not reference_no or not date or not material_code or not quantity_prepared or not quantity_return or not area_location:
+            if not reference_no or not date or not material_code or not quantity_prepared or not quantity_return or not status:
                 messagebox.showwarning("Missing Fields", "Please fill in all fields before adding.")
                 return
 
             # Ensure quantity_return is a valid integer
             try:
-                quantity_prepared = float(quantity_prepared)  # Convert to integer
-                quantity_return = float(quantity_return)
+                quantity_return = float(quantity_return)  # Convert to integer
             except ValueError:
                 messagebox.showwarning("Invalid Input", "quantity_return must be a number.")
                 return
 
-            # Get material_code_id from the material_codes table
-            get_material_id = "SELECT mid FROM material_codes WHERE material_code = %s"
+            # Step 1: Get material_code_id from the material_codes table
+            get_material_id = "SELECT mid FROM wh4_material_codes WHERE material_code = %s"
             self.cursor.execute(get_material_id, (material_code,))
             material_code_id = self.cursor.fetchone()
 
@@ -257,10 +267,69 @@ class Wh4PreparationForm:
 
             material_code_id = material_code_id[0]  # Extract the ID from the tuple
 
-            # Insert a new row into PostgreSQL (wh4_preparation_form table)
-            query = """INSERT INTO wh4_preparation_form (reference_no, date, material_code, quantity_prepared, quantity_return, area_location) 
-                       VALUES (%s, %s, %s, %s, %s, %s)"""
-            values = (reference_no, date, material_code_id, quantity_prepared, quantity_return, f"Warehouse {area_location}")
+            # Step 2: Retrieve all material codes with the same status
+            get_material_codes_with_status = """
+                SELECT material_code_name 
+                FROM wh4_material_code_totals 
+                WHERE status = %s
+            """
+            self.cursor.execute(get_material_codes_with_status, (status,))
+            matching_material_codes = self.cursor.fetchall()
+
+            if not matching_material_codes:
+                messagebox.showerror("Error", f"No material codes found with status '{status}' in the database.")
+                return
+
+            # Extract material codes into a list
+            matching_material_codes_list = [code[0] for code in matching_material_codes]
+
+            # Debug: print the list of matching material codes
+            print(f"Material Codes with Status '{status}': {matching_material_codes_list}")
+
+            # Step 3: Check if the form's material code matches the available material codes
+            if material_code not in matching_material_codes_list:
+                messagebox.showerror("Material Code Mismatch",
+                                     f"Material code '{material_code}' does not match any material code with status '{status}' in the database.")
+                return
+
+            # Step 4: Prompt the user with the matching material code and status
+            matching_codes_string = ", ".join(matching_material_codes_list)
+            print("Material Code Status Match",
+                                f"Material code '{material_code}' is valid with status '{status}'. The following material codes have the same status: {matching_codes_string}")
+
+            # Step 5: Get the total quantity for this material code from the database
+            get_total_quantity = """
+                SELECT total_quantity 
+                FROM wh4_material_code_totals 
+                WHERE material_code_name = %s AND status = %s
+            """
+            self.cursor.execute(get_total_quantity, (material_code, status))
+            total_quantity = self.cursor.fetchone()
+
+            if total_quantity is None:
+                messagebox.showerror("Error", f"Total quantity for material code '{material_code}' not found.")
+                return
+
+            total_quantity = total_quantity[0]
+
+            # Step 6: Check if the prepared quantity is less than or equal to the total quantity
+            try:
+                quantity_prepared = float(quantity_prepared)
+            except ValueError:
+                messagebox.showwarning("Invalid Input", "Quantity prepared must be a valid number.")
+                return
+
+            if quantity_prepared > total_quantity:
+                messagebox.showerror("Quantity Mismatch",
+                                     f"Quantity prepared ({quantity_prepared}) cannot exceed the total quantity ({total_quantity}).")
+                return
+
+            # Step 7: Insert a new row into PostgreSQL (wh1_preparation_form table)
+            query = """INSERT INTO wh4_preparation_form (reference_no, date, material_code, quantity_prepared, quantity_return, area_location, status) 
+                       VALUES (%s, %s, %s, %s, %s, %s, %s)"""
+            values = (
+                reference_no, date, material_code_id, quantity_prepared, quantity_return, "Warehouse 1",
+                status)
             self.cursor.execute(query, values)
             self.conn.commit()
 
@@ -269,7 +338,8 @@ class Wh4PreparationForm:
             # After adding the row, refresh the Treeview to show the updated data
             data_wh4_preparation_form = self.fetch_data_from_wh4_preparation_form()
             self.update_treeview(table, data_wh4_preparation_form,
-                                 ["Reference No.", "Date Received", "Material Code", "Quantity Prepared", "Quantity Return", "Area Location"])
+                                 ["Reference No.", "Date Received", "Material Code", "Quantity Prepared",
+                                  "Quantity Return", "Area Location", "Status"])
 
         except Exception as e:
             messagebox.showerror("Error", f"Error while adding row to Table 1: {e}")
@@ -311,7 +381,10 @@ class Wh4PreparationForm:
             material_code = self.wh4_preparation_form_entries[2].get().strip()
             quantity_prepared = self.wh4_preparation_form_entries[3].get().strip()
             quantity_return = self.wh4_preparation_form_entries[4].get().strip()
-            area_location = self.wh4_preparation_form_entries[5].get().strip()
+            status = self.wh4_preparation_form_entries[6].get().strip()
+
+            # ✅ Set "Warehouse 1" as a fixed value for area_location
+            area_location = "Warehouse 2"
 
             # Get material_code_id from material_codes table (if material_code is provided)
             material_code_id = None
@@ -337,12 +410,16 @@ class Wh4PreparationForm:
             if quantity_return:
                 query += "quantity_return = %s, "
                 values.append(float(quantity_return))  # Convert to float
-            if area_location:
-                query += "area_location = %s, "
-                values.append(area_location)
+            if status:
+                query += "status = %s, "
+                values.append(status)
+
+            # ✅ Always update area_location to "Warehouse 1"
+            query += "area_location = %s, "
+            values.append(area_location)
 
             # Ensure at least one field is being updated
-            if not values:
+            if len(values) == 1:  # Only area_location would be updated, which is unnecessary
                 messagebox.showwarning("No Changes", "No new values provided to update.")
                 return
 
@@ -359,11 +436,26 @@ class Wh4PreparationForm:
 
             messagebox.showinfo("Success", "Selected row updated successfully.")
 
-            # Refresh the Treeview to reflect the changes
-            updated_data = self.fetch_data_from_wh4_preparation_form()
-            self.update_treeview(table, updated_data,
-                                 ["Reference No.", "Date", "Material Code", "Quantity Prepared", "Quantity Return",
-                                  "Area Location"])
+            # ✅ Update only the modified row in Treeview to retain order
+            updated_values = list(selected_values)  # Convert tuple to list
+            if date:
+                updated_values[1] = date
+            if material_code:
+                updated_values[2] = material_code
+            if quantity_prepared:
+                updated_values[3] = quantity_prepared
+            if quantity_return:
+                updated_values[4] = quantity_return
+            updated_values[5] = area_location  # ✅ Always set to "Warehouse 1"
+            if status:
+                updated_values[6] = status
+
+            # ✅ Update the selected row instead of clearing the whole table
+            table.item(selected_item, values=updated_values)
+
+            # ✅ Ensure the row remains selected after updating
+            table.selection_set(selected_item)
+            table.focus(selected_item)
 
         except Exception as e:
             messagebox.showerror("Error", f"Error while updating the row: {e}")
@@ -517,7 +609,8 @@ class Wh4PreparationForm:
                 mc.material_code, 
                 wpf.quantity_prepared, 
                 wpf.quantity_return, 
-                wpf.area_location 
+                wpf.area_location,
+                wpf.status 
             FROM wh4_preparation_form wpf
             JOIN wh4_material_codes mc ON wpf.material_code = mc.mid  -- Ensure 'mid' is the correct key
             WHERE wpf.reference_no::TEXT ILIKE %s OR mc.material_code::TEXT ILIKE %s;

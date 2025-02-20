@@ -21,11 +21,11 @@ class Notes:
         try:
             if self.conn is None or self.conn.closed != 0:
                 self.conn = psycopg2.connect(
-                    host="localhost",
+                    host="192.168.1.13",
                     port=5432,
                     dbname="Inventory",
                     user="postgres",
-                    password="newpassword"
+                    password="mbpi"
                 )
                 self.cursor = self.conn.cursor()
                 print("Database connection established.")

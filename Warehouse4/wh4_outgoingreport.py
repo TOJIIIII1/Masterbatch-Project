@@ -18,11 +18,11 @@ class Wh4OutgoingReport:
             if self.conn is None or self.conn.closed != 0:
                 # Reconnect to the database if the connection is closed
                 self.conn = psycopg2.connect(
-                    host="localhost",
+                    host="192.168.1.13",
                     port=5432,
                     dbname="Inventory",
                     user="postgres",
-                    password="newpassword"
+                    password="mbpi"
                 )
                 self.cursor = self.conn.cursor()
                 print("Database connection established.")
@@ -92,7 +92,7 @@ class Wh4OutgoingReport:
         )
 
         # Title Label (with the custom style)
-        label = ttk.Label(parent_frame, text="Warehoouse 4: Outgoing Report", style="Custom.TLabel")
+        label = ttk.Label(parent_frame, text="Warehouse 4: Outgoing Report", style="Custom.TLabel")
         label.grid(row=0, column=0, columnspan=2, pady=5, sticky="ew")
 
         # Search Bar Frame
@@ -149,6 +149,8 @@ class Wh4OutgoingReport:
         wh4_material_codes = self.fetch_wh4_material_codes()
 
         for i, label_text in enumerate(column_names_wh4_outgoing_report):
+            if label_text == "Area Location":
+                continue
             col_label = ttk.Label(entry_frame, text=label_text, font=("Arial", 12))
             col_label.grid(row=0, column=i, padx=10, pady=5)
 
@@ -222,31 +224,29 @@ class Wh4OutgoingReport:
 
     # Other methods (add_row_wh4_outgoing_report, update_row_wh4_outgoing_report, etc.) remain the same.
 
-
     def add_row_wh4_outgoing_report(self, table):
         try:
             self.connect_db()  # Ensure the connection is open
 
-            # Retrieve values from entry fields for Table 1
+            # Retrieve values from entry fields for Table 4
             reference_no = self.wh4_outgoing_report_entries[0].get()
             date_outgoing = self.wh4_outgoing_report_entries[1].get()
             material_code = self.wh4_outgoing_report_entries[2].get()
             quantity = self.wh4_outgoing_report_entries[3].get()
-            area_location = self.wh4_outgoing_report_entries[4].get()
 
             # Ensure inputs are not empty
-            if not reference_no or not date_outgoing or not material_code or not quantity or not area_location:
+            if not reference_no or not date_outgoing or not material_code or not quantity:
                 messagebox.showwarning("Missing Fields", "Please fill in all fields before adding.")
                 return
 
-            # Ensure quantity is a valid integer
+            # Ensure quantity is a valid number
             try:
-                quantity = float(quantity)  # Convert to integer
+                quantity = float(quantity)  # Convert to float for quantity check
             except ValueError:
-                messagebox.showwarning("Invalid Input", "Quantity must be a number.")
+                messagebox.showwarning("Invalid Input", "Quantity must be a valid number.")
                 return
 
-            # Get material_code_id from the material_codes table
+            # Get material_code_id from the wh4_material_codes table
             get_material_id = "SELECT mid FROM wh4_material_codes WHERE material_code = %s"
             self.cursor.execute(get_material_id, (material_code,))
             material_code_id = self.cursor.fetchone()
@@ -257,14 +257,39 @@ class Wh4OutgoingReport:
 
             material_code_id = material_code_id[0]  # Extract the ID from the tuple
 
+            # Check the available total quantity in wh4_material_code_totals
+            check_quantity_query = "SELECT total_quantity FROM wh4_material_code_totals WHERE material_code_name = %s"
+            self.cursor.execute(check_quantity_query, (material_code,))
+            total_quantity_result = self.cursor.fetchone()
+
+            if total_quantity_result is None:
+                messagebox.showerror("Error", "No inventory record found for the selected material code.")
+                return
+
+            # Convert total_quantity to float before comparison
+            try:
+                total_quantity = float(total_quantity_result[0])
+            except ValueError:
+                messagebox.showerror("Error", "Invalid total quantity in database.")
+                return
+
+            # Debugging print
+            print(f"Checking stock: Available={total_quantity}, Requested={quantity}")
+
+            # Check if requested quantity exceeds available stock
+            if quantity > total_quantity:
+                messagebox.showwarning("Exceed Quantity",
+                                       f"Insufficient stock! Available: {total_quantity}, Requested: {quantity}")
+                return  # Stop execution
+
             # Insert a new row into PostgreSQL (wh4_outgoing_report table)
             query = """INSERT INTO wh4_outgoing_report (reference_no, date_outgoing, material_code, quantity, area_location) 
                        VALUES (%s, %s, %s, %s, %s)"""
-            values = (reference_no, date_outgoing, material_code_id, quantity, f"Warehouse {area_location}")
+            values = (reference_no, date_outgoing, material_code_id, quantity, "Warehouse 4")
             self.cursor.execute(query, values)
             self.conn.commit()
 
-            messagebox.showinfo("Success", "Row added successfully to Table 1.")
+            messagebox.showinfo("Success", "Row added successfully to Warehouse 4: Outgoing Report.")
 
             # After adding the row, refresh the Treeview to show the updated data
             data_wh4_outgoing_report = self.fetch_data_from_wh4_outgoing_report()
@@ -272,8 +297,8 @@ class Wh4OutgoingReport:
                                  ["Reference No.", "Date Outgoing", "Material Code", "Quantity", "Area Location"])
 
         except Exception as e:
-            messagebox.showerror("Error", f"Error while adding row to Table 1: {e}")
-            self.conn.rollback()  # Rollback the transaction if there's an error
+            messagebox.showerror("Error", f"Error while adding row to Warehouse 4: Outgoing Report: {e}")
+            self.conn.rollback()  # Ensure rollback on error
         finally:
             self.close_connection()
 
@@ -287,16 +312,16 @@ class Wh4OutgoingReport:
                 messagebox.showwarning("No Selection", "Please select a row to update.")
                 return
 
-            # Extract reference_no from selected row (assuming it's the first column)
+            # Extract values from the selected row (assuming first column is reference_no)
             selected_values = table.item(selected_item, "values")
-            reference_no = selected_values[0].strip() if selected_values else None
+            old_reference_no = selected_values[0].strip() if selected_values else None
 
-            if not reference_no:
+            if not old_reference_no:
                 messagebox.showerror("Error", "Failed to get Reference No. from the selected row.")
                 return
 
             # Fetch ID from the database using reference_no
-            self.cursor.execute("SELECT id FROM wh4_outgoing_report WHERE reference_no = %s", (reference_no,))
+            self.cursor.execute("SELECT id FROM wh4_outgoing_report WHERE reference_no = %s", (old_reference_no,))
             result = self.cursor.fetchone()
 
             if not result:
@@ -306,14 +331,10 @@ class Wh4OutgoingReport:
             row_id = result[0]  # Extract the ID
 
             # Retrieve values from entry fields (only update non-empty fields)
+            new_reference_no = self.wh4_outgoing_report_entries[0].get().strip()  # ✅ Allow updating Reference No.
             date_outgoing = self.wh4_outgoing_report_entries[1].get().strip()
             material_code = self.wh4_outgoing_report_entries[2].get().strip()
             quantity = self.wh4_outgoing_report_entries[3].get().strip()
-            area_location = self.wh4_outgoing_report_entries[4].get().strip()
-
-            # Append "Warehouse" to area_location if not empty
-            if area_location:
-                area_location = f"Warehouse {area_location}"
 
             # Get material_code_id from the material_codes table (if material_code is provided)
             material_code_id = None
@@ -327,6 +348,9 @@ class Wh4OutgoingReport:
             query = "UPDATE wh4_outgoing_report SET "
             values = []
 
+            if new_reference_no:
+                query += "reference_no = %s, "  # ✅ Update Reference No.
+                values.append(new_reference_no)
             if date_outgoing:
                 query += "date_outgoing = %s, "
                 values.append(date_outgoing)
@@ -336,9 +360,6 @@ class Wh4OutgoingReport:
             if quantity:
                 query += "quantity = %s, "
                 values.append(float(quantity))  # Ensure it's stored as a float
-            if area_location:
-                query += "area_location = %s, "
-                values.append(area_location)
 
             # Ensure at least one field is being updated
             if not values:
@@ -360,14 +381,14 @@ class Wh4OutgoingReport:
 
             # ✅ Update only the modified row in Treeview to retain order
             updated_values = list(selected_values)  # Convert tuple to list
+            if new_reference_no:
+                updated_values[0] = new_reference_no  # ✅ Update Reference No. in the table
             if date_outgoing:
                 updated_values[1] = date_outgoing
             if material_code:
                 updated_values[2] = material_code
             if quantity:
                 updated_values[3] = quantity
-            if area_location:
-                updated_values[4] = area_location
 
             # ✅ Update the selected row instead of clearing the whole table
             table.item(selected_item, values=updated_values)

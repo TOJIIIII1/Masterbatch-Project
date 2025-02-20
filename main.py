@@ -27,8 +27,8 @@ from Warehouse1.Spreedsheet_wh1 import Spreadsheet1
 from Notes import Notes
 import datetime
 
-
 class MainApp:
+    #sadjfhaskjasdasdasdasd hello
     def __init__(self):
         self.themes = [
             "solar", "cyborg", "darkly", "superhero", "vapor",  # Dark themes
